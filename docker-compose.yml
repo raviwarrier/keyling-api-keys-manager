@@ -1,0 +1,14 @@
+services:
+  key-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: homelab-key-manager
+    restart: unless-stopped
+    ports:
+      - "6644:6644"
+    environment:
+      - NODE_ENV=production
+      - PORT=6644
+    volumes:
+      - ./data:/app/data
