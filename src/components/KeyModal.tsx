@@ -25,6 +25,7 @@ interface KeyModalProps {
   onSave: (data: Partial<ApiKeyItem>) => Promise<void>;
   initialKey?: ApiKeyItem | null;
   visibility: FieldVisibilitySettings;
+  environments?: string[];
   onOpenSettings: () => void;
   onOpenSecretGenerator?: () => void;
 }
@@ -35,19 +36,21 @@ export const KeyModal: React.FC<KeyModalProps> = ({
   onSave,
   initialKey,
   visibility,
+  environments = ["Homelab", "Prod", "Dev", "Staging", "Testing", "DMZ"],
   onOpenSettings,
   onOpenSecretGenerator,
 }) => {
   const [formData, setFormData] = useState<Partial<ApiKeyItem>>({
     app_name: "",
     key_value: "",
+    provider: "",
     org_id: "",
     client_id: "",
     created_date: new Date().toISOString().slice(0, 10),
     expiry_date: "",
     account: "",
     project: "",
-    environment: "Homelab",
+    environment: environments[0] || "Homelab",
     last_used_date: "",
     status: "Active",
     ip_restrictions: "",
@@ -67,13 +70,14 @@ export const KeyModal: React.FC<KeyModalProps> = ({
       setFormData({
         app_name: initialKey.app_name || "",
         key_value: initialKey.key_value || "",
+        provider: initialKey.provider || "",
         org_id: initialKey.org_id || "",
         client_id: initialKey.client_id || "",
         created_date: initialKey.created_date ? initialKey.created_date.slice(0, 10) : "",
         expiry_date: initialKey.expiry_date ? initialKey.expiry_date.slice(0, 10) : "",
         account: initialKey.account || "",
         project: initialKey.project || "",
-        environment: initialKey.environment || "Homelab",
+        environment: initialKey.environment || environments[0] || "Homelab",
         last_used_date: initialKey.last_used_date ? initialKey.last_used_date.slice(0, 10) : "",
         status: initialKey.status || "Active",
         ip_restrictions: initialKey.ip_restrictions || "",
@@ -85,13 +89,14 @@ export const KeyModal: React.FC<KeyModalProps> = ({
       setFormData({
         app_name: "",
         key_value: "",
+        provider: "",
         org_id: "",
         client_id: "",
         created_date: new Date().toISOString().slice(0, 10),
         expiry_date: "",
         account: "",
         project: "",
-        environment: "Homelab",
+        environment: environments[0] || "Homelab",
         last_used_date: "",
         status: "Active",
         ip_restrictions: "",
@@ -104,7 +109,7 @@ export const KeyModal: React.FC<KeyModalProps> = ({
     setShowSecret(false);
     setShowOrgId(false);
     setShowClientId(false);
-  }, [initialKey, isOpen]);
+  }, [initialKey, isOpen, environments]);
 
   if (!isOpen) return null;
 
@@ -207,73 +212,9 @@ export const KeyModal: React.FC<KeyModalProps> = ({
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa]">
-                  Key Value / Token <span className="text-red-500">*</span>
-                </label>
-                <div className="flex flex-wrap items-center gap-1">
-                  <span className="text-[11px] text-[#71717a] dark:text-[#a1a1aa] mr-0.5 hidden sm:inline">Quick:</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const sec = generateSecret({ length: 24, format: "alphanumeric" });
-                      setFormData((p) => ({ ...p, key_value: sec }));
-                      setShowSecret(true);
-                    }}
-                    className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-[#f4f4f5] dark:bg-[#27272a] text-[#52525b] dark:text-[#a1a1aa] hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:text-[#09090b] dark:hover:text-[#f4f4f5] border border-[#e4e4e7] dark:border-[#3f3f46] transition-colors cursor-pointer"
-                    title="Generate 24-char alphanumeric secret"
-                  >
-                    24-Alpha
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const sec = generateSecret({ length: 36, format: "alphanumeric" });
-                      setFormData((p) => ({ ...p, key_value: sec }));
-                      setShowSecret(true);
-                    }}
-                    className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-[#f4f4f5] dark:bg-[#27272a] text-[#52525b] dark:text-[#a1a1aa] hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:text-[#09090b] dark:hover:text-[#f4f4f5] border border-[#e4e4e7] dark:border-[#3f3f46] transition-colors cursor-pointer"
-                    title="Generate 36-char alphanumeric secret"
-                  >
-                    36-Alpha
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const sec = generateSecret({ length: 48, format: "hex" });
-                      setFormData((p) => ({ ...p, key_value: sec }));
-                      setShowSecret(true);
-                    }}
-                    className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-[#f4f4f5] dark:bg-[#27272a] text-[#52525b] dark:text-[#a1a1aa] hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:text-[#09090b] dark:hover:text-[#f4f4f5] border border-[#e4e4e7] dark:border-[#3f3f46] transition-colors cursor-pointer"
-                    title="Generate 48-char hex secret"
-                  >
-                    48-Hex
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const sec = generateSecret({ length: 64, format: "alphanumeric" });
-                      setFormData((p) => ({ ...p, key_value: sec }));
-                      setShowSecret(true);
-                    }}
-                    className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-[#f4f4f5] dark:bg-[#27272a] text-[#52525b] dark:text-[#a1a1aa] hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:text-[#09090b] dark:hover:text-[#f4f4f5] border border-[#e4e4e7] dark:border-[#3f3f46] transition-colors cursor-pointer"
-                    title="Generate 64-char alphanumeric secret"
-                  >
-                    64-Alpha
-                  </button>
-                  {onOpenSecretGenerator && (
-                    <button
-                      type="button"
-                      onClick={onOpenSecretGenerator}
-                      className="px-2 py-0.5 rounded text-[10px] font-semibold bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-300 dark:hover:bg-zinc-700 border border-[#e4e4e7] dark:border-[#3f3f46] transition-colors flex items-center gap-1 cursor-pointer"
-                      title="Open Full Secret Generator"
-                    >
-                      <Sparkles className="w-3 h-3" />
-                      <span>Generator...</span>
-                    </button>
-                  )}
-                </div>
-              </div>
+              <label className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
+                Key Value / Token <span className="text-red-500">*</span>
+              </label>
               <div className="relative">
                 <input
                   id="input-key-value"
@@ -293,11 +234,96 @@ export const KeyModal: React.FC<KeyModalProps> = ({
                   {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+
+              {/* Quick Options moved BELOW the input field so Tab directly focuses key input */}
+              <div className="flex flex-wrap items-center gap-1 mt-2">
+                <span className="text-[11px] text-[#71717a] dark:text-[#a1a1aa] mr-0.5">Quick:</span>
+                <button
+                  type="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    const sec = generateSecret({ length: 24, format: "alphanumeric" });
+                    setFormData((p) => ({ ...p, key_value: sec }));
+                    setShowSecret(true);
+                  }}
+                  className="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-[#f4f4f5] dark:bg-[#27272a] text-[#52525b] dark:text-[#a1a1aa] hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:text-[#09090b] dark:hover:text-[#f4f4f5] border border-[#e4e4e7] dark:border-[#3f3f46] transition-colors cursor-pointer"
+                  title="Generate 24-char alphanumeric secret"
+                >
+                  24-Alpha
+                </button>
+                <button
+                  type="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    const sec = generateSecret({ length: 36, format: "alphanumeric" });
+                    setFormData((p) => ({ ...p, key_value: sec }));
+                    setShowSecret(true);
+                  }}
+                  className="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-[#f4f4f5] dark:bg-[#27272a] text-[#52525b] dark:text-[#a1a1aa] hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:text-[#09090b] dark:hover:text-[#f4f4f5] border border-[#e4e4e7] dark:border-[#3f3f46] transition-colors cursor-pointer"
+                  title="Generate 36-char alphanumeric secret"
+                >
+                  36-Alpha
+                </button>
+                <button
+                  type="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    const sec = generateSecret({ length: 48, format: "hex" });
+                    setFormData((p) => ({ ...p, key_value: sec }));
+                    setShowSecret(true);
+                  }}
+                  className="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-[#f4f4f5] dark:bg-[#27272a] text-[#52525b] dark:text-[#a1a1aa] hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:text-[#09090b] dark:hover:text-[#f4f4f5] border border-[#e4e4e7] dark:border-[#3f3f46] transition-colors cursor-pointer"
+                  title="Generate 48-char hex secret"
+                >
+                  48-Hex
+                </button>
+                <button
+                  type="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    const sec = generateSecret({ length: 64, format: "alphanumeric" });
+                    setFormData((p) => ({ ...p, key_value: sec }));
+                    setShowSecret(true);
+                  }}
+                  className="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-[#f4f4f5] dark:bg-[#27272a] text-[#52525b] dark:text-[#a1a1aa] hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:text-[#09090b] dark:hover:text-[#f4f4f5] border border-[#e4e4e7] dark:border-[#3f3f46] transition-colors cursor-pointer"
+                  title="Generate 64-char alphanumeric secret"
+                >
+                  64-Alpha
+                </button>
+                {onOpenSecretGenerator && (
+                  <button
+                    type="button"
+                    tabIndex={0}
+                    onClick={onOpenSecretGenerator}
+                    className="px-2 py-0.5 rounded text-[10px] font-semibold bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-300 dark:hover:bg-zinc-700 border border-[#e4e4e7] dark:border-[#3f3f46] transition-colors flex items-center gap-1 cursor-pointer"
+                    title="Open Full Secret Generator"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    <span>Generator...</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
           {/* DYNAMIC OPTIONAL FIELDS BASED ON VISIBILITY SETTINGS */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-[#e4e4e7] dark:border-[#27272a]">
+            {visibility.provider && (
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
+                  API Provider
+                </label>
+                <input
+                  id="input-provider"
+                  type="text"
+                  value={formData.provider || ""}
+                  onChange={(e) => handleChange("provider", e.target.value)}
+                  placeholder="e.g., OpenAI, Cloudflare, Proxmox, GitHub, AWS, Stripe"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#e4e4e7] dark:border-[#3f3f46] bg-white dark:bg-[#27272a] text-[#09090b] dark:text-[#f4f4f5] text-sm focus:outline-hidden focus:ring-2 focus:ring-zinc-400 dark:focus:ring-zinc-500 focus:border-zinc-500 transition-all placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
+                />
+              </div>
+            )}
+
             {visibility.org_id && (
               <div>
                 <div className="flex items-center justify-between mb-1.5">
@@ -361,16 +387,15 @@ export const KeyModal: React.FC<KeyModalProps> = ({
                 </label>
                 <select
                   id="input-environment"
-                  value={formData.environment || "Homelab"}
+                  value={formData.environment || environments[0] || "Homelab"}
                   onChange={(e) => handleChange("environment", e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-[#e4e4e7] dark:border-[#3f3f46] bg-white dark:bg-[#27272a] text-[#09090b] dark:text-[#f4f4f5] text-sm focus:outline-hidden focus:ring-2 focus:ring-zinc-400 dark:focus:ring-zinc-500 focus:border-zinc-500 transition-all"
                 >
-                  <option value="Homelab">Homelab</option>
-                  <option value="Prod">Prod</option>
-                  <option value="Dev">Dev</option>
-                  <option value="Staging">Staging</option>
-                  <option value="Testing">Testing</option>
-                  <option value="DMZ">DMZ / Edge</option>
+                  {environments.map((env) => (
+                    <option key={env} value={env}>
+                      {env}
+                    </option>
+                  ))}
                 </select>
               </div>
             )}
@@ -444,15 +469,15 @@ export const KeyModal: React.FC<KeyModalProps> = ({
             {visibility.project && (
               <div>
                 <label className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
-                  Project / Service Stack
+                  App / Service / Project
                 </label>
                 <input
                   id="input-project"
                   type="text"
                   value={formData.project || ""}
                   onChange={(e) => handleChange("project", e.target.value)}
-                  placeholder="e.g., Media Stack, Observability, K3s"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#e4e4e7] dark:border-[#3f3f46] bg-white dark:bg-[#27272a] text-[#09090b] dark:text-[#f4f4f5] text-sm focus:outline-hidden focus:ring-2 focus:ring-zinc-400 dark:focus:ring-zinc-500 focus:border-zinc-500 transition-all"
+                  placeholder="where is this token used?"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#e4e4e7] dark:border-[#3f3f46] bg-white dark:bg-[#27272a] text-[#09090b] dark:text-[#f4f4f5] text-sm focus:outline-hidden focus:ring-2 focus:ring-zinc-400 dark:focus:ring-zinc-500 focus:border-zinc-500 transition-all placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
                 />
               </div>
             )}
@@ -468,7 +493,7 @@ export const KeyModal: React.FC<KeyModalProps> = ({
                   value={formData.account || ""}
                   onChange={(e) => handleChange("account", e.target.value)}
                   placeholder="e.g., root@pam, sysadmin@local"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#e4e4e7] dark:border-[#3f3f46] bg-white dark:bg-[#27272a] text-[#09090b] dark:text-[#f4f4f5] text-sm focus:outline-hidden focus:ring-2 focus:ring-zinc-400 dark:focus:ring-zinc-500 focus:border-zinc-500 transition-all"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#e4e4e7] dark:border-[#3f3f46] bg-white dark:bg-[#27272a] text-[#09090b] dark:text-[#f4f4f5] text-sm focus:outline-hidden focus:ring-2 focus:ring-zinc-400 dark:focus:ring-zinc-500 focus:border-zinc-500 transition-all placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
                 />
               </div>
             )}
@@ -514,7 +539,7 @@ export const KeyModal: React.FC<KeyModalProps> = ({
                   value={formData.ip_restrictions || ""}
                   onChange={(e) => handleChange("ip_restrictions", e.target.value)}
                   placeholder="e.g., 192.168.1.0/24, 100.64.0.0/10, Tailnet only"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#e4e4e7] dark:border-[#3f3f46] bg-white dark:bg-[#27272a] text-[#09090b] dark:text-[#f4f4f5] text-sm focus:outline-hidden focus:ring-2 focus:ring-zinc-400 dark:focus:ring-zinc-500 focus:border-zinc-500 transition-all"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#e4e4e7] dark:border-[#3f3f46] bg-white dark:bg-[#27272a] text-[#09090b] dark:text-[#f4f4f5] text-sm focus:outline-hidden focus:ring-2 focus:ring-zinc-400 dark:focus:ring-zinc-500 focus:border-zinc-500 transition-all placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
                 />
               </div>
             )}
@@ -530,7 +555,7 @@ export const KeyModal: React.FC<KeyModalProps> = ({
                   value={formData.portal_url || ""}
                   onChange={(e) => handleChange("portal_url", e.target.value)}
                   placeholder="https://pve.internal:8006 or https://dash.cloudflare.com"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#e4e4e7] dark:border-[#3f3f46] bg-white dark:bg-[#27272a] text-[#09090b] dark:text-[#f4f4f5] text-sm focus:outline-hidden focus:ring-2 focus:ring-zinc-400 dark:focus:ring-zinc-500 focus:border-zinc-500 transition-all"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#e4e4e7] dark:border-[#3f3f46] bg-white dark:bg-[#27272a] text-[#09090b] dark:text-[#f4f4f5] text-sm focus:outline-hidden focus:ring-2 focus:ring-zinc-400 dark:focus:ring-zinc-500 focus:border-zinc-500 transition-all placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
                 />
               </div>
             )}
@@ -546,7 +571,7 @@ export const KeyModal: React.FC<KeyModalProps> = ({
                   value={formData.creator_contact || ""}
                   onChange={(e) => handleChange("creator_contact", e.target.value)}
                   placeholder="admin@homelab.local or #devops"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#e4e4e7] dark:border-[#3f3f46] bg-white dark:bg-[#27272a] text-[#09090b] dark:text-[#f4f4f5] text-sm focus:outline-hidden focus:ring-2 focus:ring-zinc-400 dark:focus:ring-zinc-500 focus:border-zinc-500 transition-all"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#e4e4e7] dark:border-[#3f3f46] bg-white dark:bg-[#27272a] text-[#09090b] dark:text-[#f4f4f5] text-sm focus:outline-hidden focus:ring-2 focus:ring-zinc-400 dark:focus:ring-zinc-500 focus:border-zinc-500 transition-all placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
                 />
               </div>
             )}
@@ -562,7 +587,7 @@ export const KeyModal: React.FC<KeyModalProps> = ({
                   value={formData.purpose || ""}
                   onChange={(e) => handleChange("purpose", e.target.value)}
                   placeholder="Explain the scope, automation jobs, or service permissions..."
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#e4e4e7] dark:border-[#3f3f46] bg-white dark:bg-[#27272a] text-[#09090b] dark:text-[#f4f4f5] text-sm focus:outline-hidden focus:ring-2 focus:ring-zinc-400 dark:focus:ring-zinc-500 focus:border-zinc-500 transition-all"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#e4e4e7] dark:border-[#3f3f46] bg-white dark:bg-[#27272a] text-[#09090b] dark:text-[#f4f4f5] text-sm focus:outline-hidden focus:ring-2 focus:ring-zinc-400 dark:focus:ring-zinc-500 focus:border-zinc-500 transition-all placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
                 />
               </div>
             )}
@@ -622,3 +647,4 @@ export const KeyModal: React.FC<KeyModalProps> = ({
     </div>
   );
 };
+

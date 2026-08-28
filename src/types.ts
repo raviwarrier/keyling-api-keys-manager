@@ -2,6 +2,7 @@ export interface ApiKeyItem {
   id: number;
   app_name: string;
   key_value: string;
+  provider?: string | null;
   org_id?: string | null;
   client_id?: string | null;
   created_date?: string | null;
@@ -18,6 +19,7 @@ export interface ApiKeyItem {
 }
 
 export type OptionalFieldKey =
+  | 'provider'
   | 'org_id'
   | 'client_id'
   | 'created_date'
@@ -32,6 +34,23 @@ export type OptionalFieldKey =
   | 'creator_contact'
   | 'purpose';
 
+export type ColumnKey =
+  | 'app_name'
+  | 'key_value'
+  | 'provider'
+  | 'org_id'
+  | 'client_id'
+  | 'status'
+  | 'environment'
+  | 'project'
+  | 'account'
+  | 'expiry_date'
+  | 'last_used_date'
+  | 'ip_restrictions'
+  | 'portal_url'
+  | 'creator_contact'
+  | 'created_date';
+
 export interface FieldConfig {
   key: OptionalFieldKey;
   label: string;
@@ -43,6 +62,7 @@ export interface FieldConfig {
 }
 
 export interface FieldVisibilitySettings {
+  provider: boolean;
   org_id: boolean;
   client_id: boolean;
   created_date: boolean;
@@ -66,3 +86,4 @@ export interface AppStats {
   paused: number;
   byEnvironment: Record<string, number>;
 }
+

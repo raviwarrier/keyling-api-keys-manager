@@ -260,10 +260,21 @@ export const KeyCards: React.FC<KeyCardsProps> = ({
 
               {/* Dynamic Metadata Attributes */}
               <div className="grid grid-cols-2 gap-2 text-xs py-1 border-t border-[#e4e4e7] dark:border-[#27272a]">
+                {visibility.provider && item.provider && (
+                  <div>
+                    <span className="text-[10px] text-[#71717a] dark:text-[#71717a] block uppercase font-medium">
+                      Provider
+                    </span>
+                    <span className="text-[#09090b] dark:text-[#f4f4f5] font-medium truncate block">
+                      {item.provider}
+                    </span>
+                  </div>
+                )}
+
                 {visibility.project && item.project && (
                   <div>
                     <span className="text-[10px] text-[#71717a] dark:text-[#71717a] block uppercase font-medium">
-                      Project
+                      App / Service / Project
                     </span>
                     <span className="text-[#09090b] dark:text-[#f4f4f5] font-medium truncate block">
                       {item.project}

@@ -264,9 +264,20 @@ export const KeyDetailsModal: React.FC<KeyDetailsModalProps> = ({
 
           {/* Key Attributes Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
+            {item.provider && (
+              <div className="p-3 rounded-xl border border-[#e4e4e7] dark:border-[#27272a] bg-[#f4f4f5]/60 dark:bg-[#27272a]/50 sm:col-span-2">
+                <span className="text-[10px] uppercase font-bold text-[#71717a] dark:text-[#a1a1aa] block mb-0.5">
+                  API Provider
+                </span>
+                <span className="text-sm font-semibold text-[#09090b] dark:text-[#f4f4f5]">
+                  {item.provider}
+                </span>
+              </div>
+            )}
+
             <div className="p-3 rounded-xl border border-[#e4e4e7] dark:border-[#27272a] bg-[#f4f4f5]/60 dark:bg-[#27272a]/50">
               <span className="text-[10px] uppercase font-bold text-[#71717a] dark:text-[#a1a1aa] block mb-0.5">
-                Project / Service
+                App / Service / Project
               </span>
               <span className="text-sm font-medium text-[#09090b] dark:text-[#f4f4f5]">
                 {item.project || "—"}

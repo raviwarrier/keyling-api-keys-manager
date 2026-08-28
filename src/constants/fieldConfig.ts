@@ -1,6 +1,34 @@
-import { FieldConfig, FieldVisibilitySettings, OptionalFieldKey } from "../types";
+import { FieldConfig, FieldVisibilitySettings, ColumnKey } from "../types";
+
+export const DEFAULT_ENVIRONMENTS: string[] = [
+  "Homelab",
+  "Prod",
+  "Dev",
+  "Staging",
+  "Testing",
+  "DMZ",
+];
+
+export const DEFAULT_COLUMN_ORDER: ColumnKey[] = [
+  "app_name",
+  "key_value",
+  "provider",
+  "org_id",
+  "client_id",
+  "status",
+  "environment",
+  "project",
+  "account",
+  "expiry_date",
+  "last_used_date",
+  "ip_restrictions",
+  "portal_url",
+  "creator_contact",
+  "created_date",
+];
 
 export const DEFAULT_FIELD_VISIBILITY: FieldVisibilitySettings = {
+  provider: true,
   org_id: true,
   client_id: true,
   created_date: true,
@@ -17,6 +45,14 @@ export const DEFAULT_FIELD_VISIBILITY: FieldVisibilitySettings = {
 };
 
 export const FIELD_CONFIGS: FieldConfig[] = [
+  {
+    key: "provider",
+    label: "API Provider",
+    description: "Provider or vendor (e.g., OpenAI, Cloudflare, Proxmox, GitHub, AWS, Stripe)",
+    category: "General",
+    type: "text",
+    placeholder: "e.g., OpenAI, Cloudflare, Proxmox, GitHub, AWS",
+  },
   {
     key: "org_id",
     label: "Organization ID (Org ID)",
@@ -77,11 +113,11 @@ export const FIELD_CONFIGS: FieldConfig[] = [
   },
   {
     key: "project",
-    label: "Project / Service",
-    description: "Associated homelab project, cluster, or container service",
+    label: "App / Service / Project",
+    description: "Associated homelab project, cluster, or container service stack",
     category: "General",
     type: "text",
-    placeholder: "e.g., Home Automation, Media Stack, K3s Cluster",
+    placeholder: "where is this token used?",
   },
   {
     key: "account",
@@ -130,6 +166,7 @@ export const VISIBILITY_PRESETS: Record<string, { label: string; description: st
     label: "Show All Fields",
     description: "Full visibility for comprehensive homelab documentation",
     settings: {
+      provider: true,
       org_id: true,
       client_id: true,
       created_date: true,
@@ -147,8 +184,9 @@ export const VISIBILITY_PRESETS: Record<string, { label: string; description: st
   },
   minimal: {
     label: "Minimalist",
-    description: "High-density view with only Environment, Status, and Expiry",
+    description: "High-density view with Provider, Environment, Status, and Expiry",
     settings: {
+      provider: true,
       org_id: false,
       client_id: false,
       created_date: false,
@@ -166,8 +204,9 @@ export const VISIBILITY_PRESETS: Record<string, { label: string; description: st
   },
   security: {
     label: "Security Audit",
-    description: "Focused on IP restrictions, Expiry, Status, and Owner",
+    description: "Focused on IP restrictions, Expiry, Status, Provider, and Owner",
     settings: {
+      provider: true,
       org_id: true,
       client_id: true,
       created_date: true,
@@ -185,8 +224,9 @@ export const VISIBILITY_PRESETS: Record<string, { label: string; description: st
   },
   homelab: {
     label: "Standard Homelab",
-    description: "Balanced selection for homelab services and dashboard links",
+    description: "Balanced selection for homelab services, providers, and dashboard links",
     settings: {
+      provider: true,
       org_id: true,
       client_id: true,
       created_date: false,
@@ -203,3 +243,4 @@ export const VISIBILITY_PRESETS: Record<string, { label: string; description: st
     },
   },
 };
+

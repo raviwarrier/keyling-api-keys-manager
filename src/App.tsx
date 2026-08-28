@@ -4,15 +4,19 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { ApiKeyItem, AppStats, FieldVisibilitySettings, OptionalFieldKey } from "./types";
-import { DEFAULT_FIELD_VISIBILITY, VISIBILITY_PRESETS } from "./constants/fieldConfig";
+import { ApiKeyItem, AppStats, FieldVisibilitySettings, OptionalFieldKey, ColumnKey } from "./types";
+import {
+  DEFAULT_FIELD_VISIBILITY,
+  VISIBILITY_PRESETS,
+  DEFAULT_COLUMN_ORDER,
+  DEFAULT_ENVIRONMENTS,
+} from "./constants/fieldConfig";
 import { Navbar } from "./components/Navbar";
 import { StatsOverview } from "./components/StatsOverview";
 import { KeyTable } from "./components/KeyTable";
 import { KeyCards } from "./components/KeyCards";
 import { KeyModal } from "./components/KeyModal";
-import { DisplaySettingsModal } from "./components/DisplaySettingsModal";
-import { BackupRestoreModal } from "./components/BackupRestoreModal";
+import { SettingsModal, SettingsTab } from "./components/SettingsModal";
 import { KeyDetailsModal } from "./components/KeyDetailsModal";
 import { DeleteConfirmModal } from "./components/DeleteConfirmModal";
 import { SecretGeneratorModal } from "./components/SecretGeneratorModal";
@@ -66,6 +70,43 @@ export default function App() {
     return DEFAULT_FIELD_VISIBILITY;
   });
 
+  // Table Column Order State (Persisted in localStorage)
+  const [columnOrder, setColumnOrder] = useState<ColumnKey[]>(() => {
+    try {
+      const saved = localStorage.getItem("homelab_keys_column_order");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Ensure all DEFAULT_COLUMN_ORDER items exist in columnOrder
+          const combined = [...parsed];
+          DEFAULT_COLUMN_ORDER.forEach((col) => {
+            if (!combined.includes(col)) combined.push(col);
+          });
+          return combined;
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to load column order from localStorage:", e);
+    }
+    return DEFAULT_COLUMN_ORDER;
+  });
+
+  // Dynamic Environment Labels (Persisted in localStorage)
+  const [environments, setEnvironments] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("homelab_keys_custom_environments");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to load environments from localStorage:", e);
+    }
+    return DEFAULT_ENVIRONMENTS;
+  });
+
   // Data State
   const [keys, setKeys] = useState<ApiKeyItem[]>([]);
   const [stats, setStats] = useState<AppStats | null>(null);
@@ -89,7 +130,7 @@ export default function App() {
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
   const [editingKey, setEditingKey] = useState<ApiKeyItem | null>(null);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab>("display");
   const [isSecretGeneratorOpen, setIsSecretGeneratorOpen] = useState(false);
   const [detailsKey, setDetailsKey] = useState<ApiKeyItem | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -212,6 +253,72 @@ export default function App() {
     addToast("info", "Settings Reset", "Restored default field visibility.");
   };
 
+  // Column order operations
+  const handleReorderColumns = (newOrder: ColumnKey[]) => {
+    setColumnOrder(newOrder);
+    localStorage.setItem("homelab_keys_column_order", JSON.stringify(newOrder));
+  };
+
+  const handleResetColumnOrder = () => {
+    setColumnOrder(DEFAULT_COLUMN_ORDER);
+    localStorage.setItem("homelab_keys_column_order", JSON.stringify(DEFAULT_COLUMN_ORDER));
+    addToast("info", "Column Order Reset", "Restored default table column arrangement.");
+  };
+
+  // Environment operations
+  const handleAddEnvironment = (name: string) => {
+    const updated = [...environments, name];
+    setEnvironments(updated);
+    localStorage.setItem("homelab_keys_custom_environments", JSON.stringify(updated));
+    addToast("success", "Environment Added", `Added environment label "${name}"`);
+  };
+
+  const handleUpdateEnvironment = async (oldName: string, newName: string) => {
+    const updated = environments.map((e) => (e === oldName ? newName : e));
+    setEnvironments(updated);
+    localStorage.setItem("homelab_keys_custom_environments", JSON.stringify(updated));
+
+    // Also update any keys that were using the old environment name in SQLite
+    const keysWithOldEnv = keys.filter((k) => k.environment === oldName);
+    if (keysWithOldEnv.length > 0) {
+      try {
+        for (const k of keysWithOldEnv) {
+          await fetch(`/api/keys/${k.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ environment: newName }),
+          });
+        }
+        fetchKeys();
+        fetchStats();
+      } catch (e) {
+        console.error("Failed to migrate existing keys to renamed environment:", e);
+      }
+    }
+
+    if (environmentFilter === oldName) {
+      setEnvironmentFilter(newName);
+    }
+
+    addToast("success", "Environment Renamed", `Renamed "${oldName}" to "${newName}"`);
+  };
+
+  const handleDeleteEnvironment = (name: string) => {
+    const updated = environments.filter((e) => e !== name);
+    setEnvironments(updated);
+    localStorage.setItem("homelab_keys_custom_environments", JSON.stringify(updated));
+    if (environmentFilter === name) {
+      setEnvironmentFilter("All");
+    }
+    addToast("info", "Environment Deleted", `Removed environment label "${name}"`);
+  };
+
+  const handleResetEnvironments = () => {
+    setEnvironments(DEFAULT_ENVIRONMENTS);
+    localStorage.setItem("homelab_keys_custom_environments", JSON.stringify(DEFAULT_ENVIRONMENTS));
+    addToast("info", "Environments Reset", "Restored default environment labels list.");
+  };
+
   // Fetch API Keys
   const fetchKeys = useCallback(async () => {
     try {
@@ -299,52 +406,26 @@ export default function App() {
     fetchStats();
   };
 
-  const handleCopyKey = (keyText: string, appName: string) => {
-    navigator.clipboard.writeText(keyText);
-    const found = keys.find((k) => k.key_value === keyText);
-    if (found) {
-      setCopiedId(found.id);
-      setTimeout(() => setCopiedId(null), 2000);
-    }
-    addToast("success", "Copied to Clipboard", `API Key for ${appName} is in your clipboard.`);
-  };
-
   const handleToggleReveal = (id: number) => {
     setRevealedKeys((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const handleTouch = async (id: number) => {
-    try {
-      const res = await fetch(`/api/keys/${id}/touch`, { method: "POST" });
-      if (res.ok) {
-        addToast("info", "Key Touched", "Updated 'Last Used' timestamp to now.");
-        fetchKeys();
-      }
-    } catch (e) {
-      console.error(e);
+  const handleCopyKey = (keyText: string, appName: string) => {
+    navigator.clipboard.writeText(keyText);
+    const item = keys.find((k) => k.key_value === keyText);
+    if (item) {
+      setCopiedId(item.id);
+      setTimeout(() => setCopiedId(null), 2000);
     }
-  };
-
-  const handleClone = async (id: number) => {
-    try {
-      const res = await fetch(`/api/keys/${id}/clone`, { method: "POST" });
-      if (res.ok) {
-        addToast("success", "Key Duplicated", "Created copy of API key.");
-        fetchKeys();
-        fetchStats();
-      }
-    } catch (e) {
-      console.error(e);
-      addToast("error", "Clone Failed", "Could not clone key.");
-    }
+    addToast("success", "Copied to Clipboard", `Copied key for "${appName}"`);
   };
 
   const handleDeleteRequest = (id: number, appName: string) => {
     setDeleteConfirm({
       isOpen: true,
       ids: [id],
-      title: `Delete ${appName}?`,
-      description: "This will permanently remove this key from your SQLite registry. This action cannot be undone.",
+      title: `Delete "${appName}"?`,
+      description: `This action will permanently remove this API key credential and its associated metadata from your SQLite homelab registry.`,
     });
   };
 
@@ -353,48 +434,103 @@ export default function App() {
     setDeleteConfirm({
       isOpen: true,
       ids: selectedIds,
-      title: `Delete ${selectedIds.length} Selected Keys?`,
-      description: `This will permanently delete ${selectedIds.length} keys from your SQLite database.`,
+      title: `Delete ${selectedIds.length} API Keys?`,
+      description: `Are you sure you want to delete ${selectedIds.length} selected key records? This action cannot be undone.`,
     });
   };
 
   const handleConfirmDelete = async () => {
     try {
       if (deleteConfirm.ids.length === 1) {
-        await fetch(`/api/keys/${deleteConfirm.ids[0]}`, { method: "DELETE" });
+        const res = await fetch(`/api/keys/${deleteConfirm.ids[0]}`, { method: "DELETE" });
+        if (!res.ok) throw new Error("Failed to delete key");
+        addToast("info", "Key Deleted", "The API key was removed from the registry.");
       } else {
-        await fetch("/api/keys/bulk-delete", {
-          method: "POST",
+        const res = await fetch("/api/keys/bulk", {
+          method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ids: deleteConfirm.ids }),
         });
+        if (!res.ok) throw new Error("Failed to delete selected keys");
+        addToast("info", "Batch Deleted", `Removed ${deleteConfirm.ids.length} keys from the registry.`);
       }
-      addToast("info", "Deleted", `Removed ${deleteConfirm.ids.length} key(s).`);
-      setSelectedIds([]);
+      setSelectedIds((prev) => prev.filter((id) => !deleteConfirm.ids.includes(id)));
       setDeleteConfirm((prev) => ({ ...prev, isOpen: false }));
       fetchKeys();
       fetchStats();
-    } catch (e) {
-      console.error(e);
-      addToast("error", "Delete Failed", "Could not remove key(s).");
+    } catch (err: any) {
+      console.error(err);
+      addToast("error", "Delete Failed", err.message || "Could not delete key");
     }
   };
 
-  const handleBulkStatus = async (status: string) => {
+  const handleClone = (id: number) => {
+    const item = keys.find((k) => k.id === id);
+    if (!item) return;
+    const cloned: Partial<ApiKeyItem> = {
+      ...item,
+      app_name: `${item.app_name} (Copy)`,
+      key_value: `${item.key_value}_copy`,
+    };
+    delete (cloned as any).id;
+    setEditingKey(cloned as ApiKeyItem);
+    setIsKeyModalOpen(true);
+  };
+
+  const handleTouch = async (id: number) => {
+    try {
+      const res = await fetch(`/api/keys/${id}/touch`, { method: "POST" });
+      if (!res.ok) throw new Error("Failed to update activity");
+      addToast("success", "Activity Recorded", "Marked key as active right now.");
+      fetchKeys();
+      fetchStats();
+    } catch (err: any) {
+      console.error(err);
+      addToast("error", "Error", "Could not record key usage");
+    }
+  };
+
+  // Bulk Operations
+  const handleBulkStatus = async (status: "Active" | "Revoked" | "Paused") => {
     if (selectedIds.length === 0) return;
     try {
-      await fetch("/api/keys/bulk-status", {
-        method: "POST",
+      const res = await fetch("/api/keys/bulk/status", {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: selectedIds, status }),
       });
-      addToast("success", "Status Updated", `Updated ${selectedIds.length} keys to '${status}'.`);
+      if (!res.ok) throw new Error("Failed to update status");
+      addToast("success", "Status Updated", `Updated ${selectedIds.length} keys to ${status}`);
       setSelectedIds([]);
       fetchKeys();
       fetchStats();
-    } catch (e) {
-      console.error(e);
-      addToast("error", "Update Failed", "Could not update status.");
+    } catch (err: any) {
+      console.error(err);
+      addToast("error", "Error", "Failed to update bulk status");
+    }
+  };
+
+  // Selection
+  const handleToggleSelect = (id: number) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.length === keys.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(keys.map((k) => k.id));
+    }
+  };
+
+  const handleSortChange = (column: string) => {
+    if (sortBy === column) {
+      setSortOrder((prev) => (prev === "ASC" ? "DESC" : "ASC"));
+    } else {
+      setSortBy(column);
+      setSortOrder("ASC");
     }
   };
 
@@ -408,42 +544,27 @@ export default function App() {
       const err = await res.json();
       throw new Error(err.error || "Failed to restore backup");
     }
+    const data = await res.json();
+    addToast(
+      "success",
+      "Backup Restored",
+      `Successfully imported ${data.importedCount} keys into SQLite database.`
+    );
+    setSelectedIds([]);
     fetchKeys();
     fetchStats();
-    addToast("success", "Backup Restored", `Imported ${items.length} keys into SQLite (${mode} mode).`);
   };
 
-  const handleSortChange = (column: string) => {
-    if (sortBy === column) {
-      setSortOrder((prev) => (prev === "ASC" ? "DESC" : "ASC"));
-    } else {
-      setSortBy(column);
-      setSortOrder("ASC");
-    }
+  const openSettingsModal = (tab: SettingsTab = "display") => {
+    setSettingsInitialTab(tab);
+    setIsSettingsModalOpen(true);
   };
-
-  const handleToggleSelect = (id: number) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
-  };
-
-  const handleSelectAll = () => {
-    if (selectedIds.length === keys.length) {
-      setSelectedIds([]);
-    } else {
-      setSelectedIds(keys.map((k) => k.id));
-    }
-  };
-
-  const activeOptionalCount = Object.values(visibility).filter(Boolean).length;
 
   return (
-    <div className="min-h-screen bg-[#f4f4f5] dark:bg-[#09090b] text-[#09090b] dark:text-[#f4f4f5] flex flex-col font-sans transition-colors duration-150">
-      {/* Toast Manager */}
-      <ToastContainer toasts={toasts} onDismiss={removeToast} />
+    <div className="min-h-screen bg-[#fafafa] dark:bg-[#121214] text-[#09090b] dark:text-[#f4f4f5] flex flex-col font-sans transition-colors duration-150 selection:bg-zinc-300 dark:selection:bg-zinc-700">
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
 
-      {/* Top Navbar with Search, Filter & Controls */}
+      {/* Header & Sticky Navigation Bar with Hamburger Menu */}
       <Navbar
         search={search}
         onSearchChange={setSearch}
@@ -454,20 +575,19 @@ export default function App() {
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         isDarkMode={isDarkMode}
-        onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
-        onOpenSettings={() => setIsSettingsModalOpen(true)}
-        onOpenBackup={() => setIsBackupModalOpen(true)}
+        onToggleDarkMode={() => setIsDarkMode((prev) => !prev)}
+        onOpenSettings={openSettingsModal}
         onOpenSecretGenerator={() => setIsSecretGeneratorOpen(true)}
         onOpenAddModal={() => {
           setEditingKey(null);
           setIsKeyModalOpen(true);
         }}
-        activeOptionalFieldsCount={activeOptionalCount}
+        environments={environments}
       />
 
-      {/* Main Container */}
-      <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6 flex-1">
-        {/* Metric Cards Overview */}
+      {/* Main Content Area */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-5">
+        {/* Metric Stats Cards & Environmental Pills */}
         <StatsOverview
           stats={stats}
           selectedStatus={statusFilter}
@@ -476,22 +596,22 @@ export default function App() {
           onSelectEnv={setEnvironmentFilter}
         />
 
-        {/* Bulk Action Bar (when rows are selected) */}
+        {/* Bulk Action Toolbar */}
         {selectedIds.length > 0 && (
-          <div className="p-3 px-4 rounded-xl bg-white dark:bg-[#18181b] border border-[#e4e4e7] dark:border-[#27272a] shadow-xs flex flex-wrap items-center justify-between gap-3 animate-in fade-in">
+          <div
+            id="bulk-action-bar"
+            className="p-3 px-4 bg-white dark:bg-[#18181b] border border-[#e4e4e7] dark:border-[#27272a] rounded-xl shadow-lg flex flex-wrap items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 duration-150"
+          >
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-[#09090b] dark:text-[#f4f4f5]">
-                {selectedIds.length} key{selectedIds.length > 1 ? "s" : ""} selected
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-zinc-200 dark:bg-zinc-800 text-[#09090b] dark:text-[#f4f4f5]">
+                {selectedIds.length} Selected
               </span>
-              <button
-                onClick={() => setSelectedIds([])}
-                className="text-[11px] text-[#71717a] dark:text-[#a1a1aa] hover:underline cursor-pointer"
-              >
-                Deselect all
-              </button>
+              <span className="text-xs text-[#71717a] dark:text-[#a1a1aa] hidden sm:inline">
+                Bulk change status or delete records:
+              </span>
             </div>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <button
                 onClick={() => handleBulkStatus("Active")}
                 className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 text-xs font-medium border border-emerald-500/30 flex items-center gap-1 cursor-pointer transition-colors"
@@ -564,11 +684,13 @@ export default function App() {
           </div>
         ) : viewMode === "table" ? (
           <div className="space-y-4">
-            {/* Desktop Table */}
+            {/* Desktop Table with Custom Column Order & Sticky Actions */}
             <div className="hidden lg:block">
               <KeyTable
                 keys={keys}
                 visibility={visibility}
+                columnOrder={columnOrder}
+                onReorderColumns={handleReorderColumns}
                 revealedKeys={revealedKeys}
                 onToggleReveal={handleToggleReveal}
                 onCopyKey={handleCopyKey}
@@ -643,9 +765,10 @@ export default function App() {
         onSave={handleSaveKey}
         initialKey={editingKey}
         visibility={visibility}
+        environments={environments}
         onOpenSettings={() => {
           setIsKeyModalOpen(false);
-          setIsSettingsModalOpen(true);
+          openSettingsModal("display");
         }}
         onOpenSecretGenerator={() => setIsSecretGeneratorOpen(true)}
       />
@@ -659,23 +782,30 @@ export default function App() {
         }}
         onSelectSecret={(secret) => {
           if (isKeyModalOpen) {
-            setEditingKey((prev) => (prev ? { ...prev, key_value: secret } : ({ app_name: "", key_value: secret } as any)));
+            setEditingKey((prev) =>
+              prev ? { ...prev, key_value: secret } : ({ app_name: "", key_value: secret } as any)
+            );
           }
         }}
       />
 
-      <DisplaySettingsModal
+      {/* Unified Settings Modal (Display, Columns, Environments, Backup) */}
+      <SettingsModal
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
+        initialTab={settingsInitialTab}
         visibility={visibility}
         onToggleField={handleToggleField}
         onApplyPreset={handleApplyPreset}
-        onReset={handleResetVisibility}
-      />
-
-      <BackupRestoreModal
-        isOpen={isBackupModalOpen}
-        onClose={() => setIsBackupModalOpen(false)}
+        onResetVisibility={handleResetVisibility}
+        columnOrder={columnOrder}
+        onReorderColumns={handleReorderColumns}
+        onResetColumnOrder={handleResetColumnOrder}
+        environments={environments}
+        onAddEnvironment={handleAddEnvironment}
+        onUpdateEnvironment={handleUpdateEnvironment}
+        onDeleteEnvironment={handleDeleteEnvironment}
+        onResetEnvironments={handleResetEnvironments}
         onImportJson={handleImportJson}
         totalKeys={keys.length}
       />

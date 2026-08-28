@@ -310,6 +310,52 @@ This project is proudly "vibe coded" with the assistance of AI coding agents, de
 
 ---
 
+## Updating and Upgrading
+
+### Updating Local Node.js / PM2 Installations
+
+To update an existing installation to the latest version:
+
+1. Navigate to the project directory:
+   ```bash
+   cd <repository-directory>
+   ```
+
+2. Pull latest changes:
+   ```bash
+   git pull origin main
+   ```
+
+3. Install updated dependencies and re-build:
+   ```bash
+   npm install
+   npm run build
+   ```
+
+4. Restart the service with PM2:
+   ```bash
+   pm2 restart keyling
+   ```
+   *(Your stored keys in `./data/homelab_keys.sqlite` will be preserved; database migrations are run automatically on startup).*
+
+---
+
+### Updating Docker Deployments
+
+1. Pull or rebuild Docker image:
+   ```bash
+   docker compose pull
+   # or rebuild if using local Dockerfile:
+   docker compose build --no-cache
+   ```
+
+2. Restart container:
+   ```bash
+   docker compose up -d
+   ```
+
+---
+
 ## License
 
 This software is released under the MIT License. You are free to use, modify, distribute, fork, and adapt this software for personal, educational, or commercial purposes without restriction.

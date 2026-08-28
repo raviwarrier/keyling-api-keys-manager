@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Search,
   SlidersHorizontal,
@@ -8,12 +8,17 @@ import {
   Plus,
   LayoutGrid,
   List,
-  Filter,
   X,
-  ShieldCheck,
   Sparkles,
+  Menu,
+  Tag,
+  ArrowUpDown,
+  FileJson,
+  FileSpreadsheet,
+  Check,
 } from "lucide-react";
 import { KeylingLogo } from "./KeylingLogo";
+import { SettingsTab } from "./SettingsModal";
 
 interface NavbarProps {
   search: string;
@@ -26,11 +31,10 @@ interface NavbarProps {
   onViewModeChange: (mode: "table" | "cards") => void;
   isDarkMode: boolean;
   onToggleDarkMode: () => void;
-  onOpenSettings: () => void;
-  onOpenBackup: () => void;
+  onOpenSettings: (tab?: SettingsTab) => void;
   onOpenSecretGenerator: () => void;
   onOpenAddModal: () => void;
-  activeOptionalFieldsCount: number;
+  environments: string[];
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -45,11 +49,28 @@ export const Navbar: React.FC<NavbarProps> = ({
   isDarkMode,
   onToggleDarkMode,
   onOpenSettings,
-  onOpenBackup,
   onOpenSecretGenerator,
   onOpenAddModal,
-  activeOptionalFieldsCount,
+  environments,
 }) => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    if (isMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isMenuOpen]);
+
   return (
     <header className="sticky top-0 z-30 bg-white/95 dark:bg-[#121214]/95 backdrop-blur-md border-b border-[#e4e4e7] dark:border-[#27272a]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 space-y-3">
@@ -81,7 +102,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Action Bar (Top Right) */}
           <div className="flex items-center gap-1.5 sm:gap-2">
-            {/* View Mode Toggle (Table / Card) */}
+            {/* View Mode Toggle (Table / Card) - Unchanged */}
             <div className="hidden sm:flex items-center bg-[#f4f4f5] dark:bg-[#18181b] p-0.5 rounded-xl border border-[#e4e4e7] dark:border-[#27272a]">
               <button
                 id="view-table-btn"
@@ -111,7 +132,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             </div>
 
-            {/* Secret Generator Utility Trigger */}
+            {/* Secret Generator Utility Trigger - Unchanged */}
             <button
               id="secret-generator-trigger-btn"
               onClick={onOpenSecretGenerator}
@@ -122,32 +143,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="hidden md:inline">Secrets</span>
             </button>
 
-            {/* Display Settings Trigger */}
-            <button
-              id="display-settings-trigger-btn"
-              onClick={onOpenSettings}
-              className="p-2 sm:px-3 sm:py-1.5 rounded-xl border border-[#e4e4e7] dark:border-[#27272a] bg-[#f4f4f5] dark:bg-[#18181b] text-[#52525b] dark:text-[#e4e4e7] hover:bg-[#e4e4e7] dark:hover:bg-[#27272a] text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
-              title="Display Settings & Field Visibility"
-            >
-              <SlidersHorizontal className="w-4 h-4 text-[#71717a] dark:text-[#a1a1aa]" />
-              <span className="hidden md:inline">Display</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white dark:bg-[#27272a] text-[#52525b] dark:text-[#a1a1aa] border border-[#e4e4e7] dark:border-[#3f3f46]">
-                {activeOptionalFieldsCount + 2}
-              </span>
-            </button>
-
-            {/* Backup & Restore */}
-            <button
-              id="backup-restore-trigger-btn"
-              onClick={onOpenBackup}
-              className="p-2 sm:px-3 sm:py-1.5 rounded-xl border border-[#e4e4e7] dark:border-[#27272a] bg-[#f4f4f5] dark:bg-[#18181b] text-[#52525b] dark:text-[#e4e4e7] hover:bg-[#e4e4e7] dark:hover:bg-[#27272a] text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
-              title="Backup & Restore"
-            >
-              <Database className="w-4 h-4 text-[#71717a] dark:text-[#a1a1aa]" />
-              <span className="hidden md:inline">Backup</span>
-            </button>
-
-            {/* Dark / Light Mode Toggle */}
+            {/* Dark / Light Mode Toggle - Unchanged */}
             <button
               id="theme-toggle-btn"
               onClick={onToggleDarkMode}
@@ -156,6 +152,124 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-[#52525b]" />}
             </button>
+
+            {/* Hamburger Menu Dropdown Trigger */}
+            <div className="relative" ref={menuRef}>
+              <button
+                id="hamburger-menu-btn"
+                onClick={() => setIsMenuOpen((prev) => !prev)}
+                className={`p-2 sm:px-3 sm:py-1.5 rounded-xl border transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs text-xs font-medium ${
+                  isMenuOpen
+                    ? "border-zinc-400 bg-zinc-200 dark:bg-zinc-800 text-[#09090b] dark:text-[#f4f4f5]"
+                    : "border-[#e4e4e7] dark:border-[#27272a] bg-[#f4f4f5] dark:bg-[#18181b] text-[#52525b] dark:text-[#e4e4e7] hover:bg-[#e4e4e7] dark:hover:bg-[#27272a]"
+                }`}
+                title="Application Settings & Tools"
+              >
+                <Menu className="w-4 h-4" />
+                <span className="hidden md:inline">Menu</span>
+              </button>
+
+              {/* Hamburger Dropdown Content */}
+              {isMenuOpen && (
+                <div
+                  id="hamburger-dropdown-menu"
+                  className="absolute right-0 mt-2 w-56 bg-white dark:bg-[#18181b] border border-[#e4e4e7] dark:border-[#27272a] rounded-2xl shadow-xl z-50 py-1.5 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+                >
+                  <div className="px-3.5 py-2 border-b border-[#e4e4e7] dark:border-[#27272a]">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-[#71717a] dark:text-[#a1a1aa] block">
+                      Settings & Tools
+                    </span>
+                  </div>
+
+                  {/* Display & Fields */}
+                  <button
+                    id="menu-display-settings-btn"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      onOpenSettings("display");
+                    }}
+                    className="w-full px-3.5 py-2 text-left text-xs font-medium text-[#09090b] dark:text-[#f4f4f5] hover:bg-[#f4f4f5] dark:hover:bg-[#27272a] flex items-center gap-2.5 transition-colors cursor-pointer"
+                  >
+                    <SlidersHorizontal className="w-4 h-4 text-zinc-500 shrink-0" />
+                    <div>
+                      <div className="font-medium">Display & Fields</div>
+                      <div className="text-[10px] text-[#71717a] dark:text-[#a1a1aa]">Toggle optional fields</div>
+                    </div>
+                  </button>
+
+                  {/* Column Rearrangement */}
+                  <button
+                    id="menu-columns-settings-btn"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      onOpenSettings("columns");
+                    }}
+                    className="w-full px-3.5 py-2 text-left text-xs font-medium text-[#09090b] dark:text-[#f4f4f5] hover:bg-[#f4f4f5] dark:hover:bg-[#27272a] flex items-center gap-2.5 transition-colors cursor-pointer"
+                  >
+                    <ArrowUpDown className="w-4 h-4 text-zinc-500 shrink-0" />
+                    <div>
+                      <div className="font-medium">Rearrange Columns</div>
+                      <div className="text-[10px] text-[#71717a] dark:text-[#a1a1aa]">Reorder table view columns</div>
+                    </div>
+                  </button>
+
+                  {/* Environment Labels Management */}
+                  <button
+                    id="menu-environments-settings-btn"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      onOpenSettings("environments");
+                    }}
+                    className="w-full px-3.5 py-2 text-left text-xs font-medium text-[#09090b] dark:text-[#f4f4f5] hover:bg-[#f4f4f5] dark:hover:bg-[#27272a] flex items-center gap-2.5 transition-colors cursor-pointer"
+                  >
+                    <Tag className="w-4 h-4 text-zinc-500 shrink-0" />
+                    <div>
+                      <div className="font-medium">Environment Labels</div>
+                      <div className="text-[10px] text-[#71717a] dark:text-[#a1a1aa]">Add / edit / delete labels</div>
+                    </div>
+                  </button>
+
+                  {/* Backup & Restore */}
+                  <button
+                    id="menu-backup-settings-btn"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      onOpenSettings("backup");
+                    }}
+                    className="w-full px-3.5 py-2 text-left text-xs font-medium text-[#09090b] dark:text-[#f4f4f5] hover:bg-[#f4f4f5] dark:hover:bg-[#27272a] flex items-center gap-2.5 transition-colors cursor-pointer"
+                  >
+                    <Database className="w-4 h-4 text-zinc-500 shrink-0" />
+                    <div>
+                      <div className="font-medium">Backup & Restore</div>
+                      <div className="text-[10px] text-[#71717a] dark:text-[#a1a1aa]">Export / import SQLite data</div>
+                    </div>
+                  </button>
+
+                  <div className="my-1 border-t border-[#e4e4e7] dark:border-[#27272a]" />
+
+                  {/* Quick Direct Exports */}
+                  <a
+                    href="/api/export/json"
+                    download
+                    onClick={() => setIsMenuOpen(false)}
+                    className="w-full px-3.5 py-2 text-left text-xs text-[#52525b] dark:text-[#a1a1aa] hover:text-[#09090b] dark:hover:text-[#f4f4f5] hover:bg-[#f4f4f5] dark:hover:bg-[#27272a] flex items-center gap-2.5 transition-colors cursor-pointer"
+                  >
+                    <FileJson className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>Download JSON Backup</span>
+                  </a>
+
+                  <a
+                    href="/api/export/csv"
+                    download
+                    onClick={() => setIsMenuOpen(false)}
+                    className="w-full px-3.5 py-2 text-left text-xs text-[#52525b] dark:text-[#a1a1aa] hover:text-[#09090b] dark:hover:text-[#f4f4f5] hover:bg-[#f4f4f5] dark:hover:bg-[#27272a] flex items-center gap-2.5 transition-colors cursor-pointer"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <span>Download CSV Sheet</span>
+                  </a>
+                </div>
+              )}
+            </div>
 
             {/* Register Key Primary CTA */}
             <button
@@ -180,7 +294,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               type="text"
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Search App Name, Key, Project, Account, Purpose..."
+              placeholder="Search App Name, Provider, Key, Project, Account, Purpose..."
               className="w-full pl-10 pr-9 py-2 rounded-xl border border-[#e4e4e7] dark:border-[#27272a] bg-[#f4f4f5] dark:bg-[#18181b] text-[#09090b] dark:text-[#f4f4f5] text-xs focus:outline-hidden focus:ring-2 focus:ring-[#71717a]/30 focus:border-[#71717a] transition-all placeholder:text-[#a1a1aa] dark:placeholder:text-[#71717a]"
             />
             {search && (
@@ -195,7 +309,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Filter Dropdowns */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* Environment Filter */}
+            {/* Dynamic Environment Filter */}
             <div className="relative flex-1 sm:flex-none">
               <select
                 id="filter-environment-select"
@@ -204,12 +318,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className="w-full sm:w-auto pl-3 pr-8 py-2 rounded-xl border border-[#e4e4e7] dark:border-[#27272a] bg-[#f4f4f5] dark:bg-[#18181b] text-[#09090b] dark:text-[#a1a1aa] text-xs font-medium focus:outline-hidden focus:ring-2 focus:ring-[#71717a]/30 cursor-pointer"
               >
                 <option value="All">All Environments</option>
-                <option value="Homelab">Homelab</option>
-                <option value="Prod">Prod</option>
-                <option value="Dev">Dev</option>
-                <option value="Staging">Staging</option>
-                <option value="Testing">Testing</option>
-                <option value="DMZ">DMZ</option>
+                {environments.map((env) => (
+                  <option key={env} value={env}>
+                    {env}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -234,4 +347,3 @@ export const Navbar: React.FC<NavbarProps> = ({
     </header>
   );
 };
-

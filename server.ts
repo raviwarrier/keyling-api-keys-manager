@@ -46,6 +46,7 @@ async function initDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       app_name TEXT NOT NULL,
       key_value TEXT NOT NULL,
+      provider TEXT,
       org_id TEXT,
       client_id TEXT,
       created_date TEXT,
@@ -62,10 +63,14 @@ async function initDatabase() {
     );
   `);
 
-  // Migrate existing databases to add org_id and client_id if missing
+  // Migrate existing databases to add missing columns
   try {
     const tableInfo = queryAll<any>("PRAGMA table_info(api_keys);");
     const columnNames = tableInfo.map((c: any) => c.name);
+    if (!columnNames.includes("provider")) {
+      db.run("ALTER TABLE api_keys ADD COLUMN provider TEXT;");
+      console.log("Migrated SQLite schema: added provider column.");
+    }
     if (!columnNames.includes("org_id")) {
       db.run("ALTER TABLE api_keys ADD COLUMN org_id TEXT;");
       console.log("Migrated SQLite schema: added org_id column.");
@@ -124,9 +129,9 @@ async function startServer() {
       const params: any[] = [];
 
       if (search.trim()) {
-        query += " AND (app_name LIKE ? OR key_value LIKE ? OR project LIKE ? OR account LIKE ? OR purpose LIKE ? OR org_id LIKE ? OR client_id LIKE ?)";
+        query += " AND (app_name LIKE ? OR key_value LIKE ? OR provider LIKE ? OR project LIKE ? OR account LIKE ? OR purpose LIKE ? OR org_id LIKE ? OR client_id LIKE ?)";
         const pattern = `%${search.trim()}%`;
-        params.push(pattern, pattern, pattern, pattern, pattern, pattern, pattern);
+        params.push(pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern);
       }
 
       if (environment.trim() && environment !== "All") {
@@ -139,7 +144,7 @@ async function startServer() {
         params.push(status.trim());
       }
 
-      const allowedSortColumns = ["id", "app_name", "created_date", "expiry_date", "last_used_date", "environment", "status", "project", "org_id", "client_id"];
+      const allowedSortColumns = ["id", "app_name", "provider", "created_date", "expiry_date", "last_used_date", "environment", "status", "project", "org_id", "client_id"];
       const cleanSort = allowedSortColumns.includes(sortBy) ? sortBy : "id";
 
       query += ` ORDER BY ${cleanSort} ${sortOrder};`;
@@ -224,6 +229,7 @@ async function startServer() {
       const {
         app_name,
         key_value,
+        provider,
         org_id,
         client_id,
         created_date,
@@ -250,11 +256,12 @@ async function startServer() {
       const currentStatus = status || "Active";
 
       db.run(
-        `INSERT INTO api_keys (app_name, key_value, org_id, client_id, created_date, expiry_date, account, project, environment, last_used_date, status, ip_restrictions, portal_url, creator_contact, purpose)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+        `INSERT INTO api_keys (app_name, key_value, provider, org_id, client_id, created_date, expiry_date, account, project, environment, last_used_date, status, ip_restrictions, portal_url, creator_contact, purpose)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
         [
           app_name.trim(),
           key_value.trim(),
+          provider ? provider.trim() : null,
           org_id ? org_id.trim() : null,
           client_id ? client_id.trim() : null,
           created,
@@ -294,6 +301,7 @@ async function startServer() {
       const {
         app_name,
         key_value,
+        provider,
         org_id,
         client_id,
         created_date,
@@ -320,6 +328,7 @@ async function startServer() {
         `UPDATE api_keys SET
           app_name = ?,
           key_value = ?,
+          provider = ?,
           org_id = ?,
           client_id = ?,
           created_date = ?,
@@ -337,6 +346,7 @@ async function startServer() {
         [
           app_name.trim(),
           key_value.trim(),
+          provider ? provider.trim() : null,
           org_id ? org_id.trim() : null,
           client_id ? client_id.trim() : null,
           created_date || null,
@@ -400,11 +410,12 @@ async function startServer() {
       }
 
       db.run(
-        `INSERT INTO api_keys (app_name, key_value, org_id, client_id, created_date, expiry_date, account, project, environment, last_used_date, status, ip_restrictions, portal_url, creator_contact, purpose)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+        `INSERT INTO api_keys (app_name, key_value, provider, org_id, client_id, created_date, expiry_date, account, project, environment, last_used_date, status, ip_restrictions, portal_url, creator_contact, purpose)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
         [
           `${original.app_name} (Copy)`,
           original.key_value,
+          original.provider || null,
           original.org_id || null,
           original.client_id || null,
           new Date().toISOString(),
@@ -480,6 +491,7 @@ async function startServer() {
         "id",
         "app_name",
         "key_value",
+        "provider",
         "org_id",
         "client_id",
         "created_date",
@@ -544,11 +556,12 @@ async function startServer() {
         if (!item.app_name || !item.key_value) continue;
 
         db.run(
-          `INSERT INTO api_keys (app_name, key_value, org_id, client_id, created_date, expiry_date, account, project, environment, last_used_date, status, ip_restrictions, portal_url, creator_contact, purpose)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+          `INSERT INTO api_keys (app_name, key_value, provider, org_id, client_id, created_date, expiry_date, account, project, environment, last_used_date, status, ip_restrictions, portal_url, creator_contact, purpose)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
           [
             item.app_name.trim(),
             item.key_value.trim(),
+            item.provider ? String(item.provider).trim() : null,
             item.org_id ? String(item.org_id).trim() : null,
             item.client_id ? String(item.client_id).trim() : null,
             item.created_date || new Date().toISOString(),
