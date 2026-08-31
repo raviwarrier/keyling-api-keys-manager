@@ -17,6 +17,7 @@ coverage/
 # Environment variables
 .env*
 !.env.example
+
 # SQLite Databases (Protects your local database from Git operations)
 *.db
 *.db-journal

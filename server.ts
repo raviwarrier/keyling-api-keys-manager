@@ -4,7 +4,8 @@ import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import initSqlJs, { Database } from "sql.js";
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const PORT: number = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const HOST: string = process.env.HOST || "127.0.0.1";
 const DATA_DIR = path.join(process.cwd(), "data");
 const DB_FILE = path.join(DATA_DIR, "homelab_keys.sqlite");
 
@@ -603,8 +604,8 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Homelab API Key Manager server running at http://0.0.0.0:${PORT}`);
+  app.listen(PORT, HOST, () => {
+    console.log(`Homelab API Key Manager server running at http://${HOST}:${PORT}`);
   });
 }
 
