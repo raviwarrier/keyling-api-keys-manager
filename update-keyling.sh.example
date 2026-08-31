@@ -1,0 +1,46 @@
+echo "❌ Error: Directory $APP_DIR does not exist."
+    exit 1
+fi
+
+# Step 1: Stop PM2 to release open file locks on node_modules
+echo "🛑 Stopping PM2 process to release file handles..."
+pm2 stop "$PM2_NAME" 2>/dev/null || true
+
+# Step 2: Backup database before pulling updates
+if [ -f "$APP_DIR/data/homelab_keys.sqlite" ]; then
+    cp "$APP_DIR/data/homelab_keys.sqlite" "$APP_DIR/data/homelab_keys.sqlite.bak_$(date +%Y%m%d_%H%M%S)"
+    echo "💾 Database backed up."
+fi
+
+# Step 3: Fetch latest code from GitHub
+echo "📥 Fetching latest code from GitHub..."
+git fetch origin main
+git reset --hard origin/main
+
+# Step 4: Clean stale node_modules to avoid ENOTEMPTY / Rollup locks
+echo "🧹 Cleaning node_modules..."
+rm -rf node_modules
+
+# Step 5: Install dependencies
+echo "📦 Installing npm dependencies..."
+npm ci --omit=dev=false
+
+# Step 6: Build application
+if grep -q '"build":' package.json; then
+    echo "🏗️ Building application..."
+    npm run build
+fi
+
+# Step 7: Restart PM2 process
+echo "🔄 Starting app in PM2..."
+cd "$HOME" || exit 1
+
+if [ -f "$ECOSYSTEM_PATH" ]; then
+    pm2 restart "$ECOSYSTEM_PATH" --only "$PM2_NAME" || pm2 start "$ECOSYSTEM_PATH" --only "$PM2_NAME"
+else
+    pm2 restart "$PM2_NAME" || pm2 start "$PM2_NAME"
+fi
+
+pm2 save
+
+echo "✅ Keyling update complete!"
