@@ -1,4 +1,15 @@
-echo "❌ Error: Directory $APP_DIR does not exist."
+#!/bin/bash
+
+APP_DIR="/srv/ssd/Appdata/local/keyling"
+PM2_NAME="keyling"
+ECOSYSTEM_PATH="$HOME/ecosystem.config.js"
+
+echo "🚀 Starting update for Keyling..."
+
+if [ -d "$APP_DIR" ]; then
+    cd "$APP_DIR" || exit 1
+else
+    echo "❌ Error: Directory $APP_DIR does not exist."
     exit 1
 fi
 
@@ -21,7 +32,7 @@ git reset --hard origin/main
 echo "🧹 Cleaning node_modules..."
 rm -rf node_modules
 
-# Step 5: Install dependencies
+# Step 5: Install dependencies (including devDependencies required for Vite build)
 echo "📦 Installing npm dependencies..."
 npm ci --omit=dev=false
 
