@@ -1,15 +1,11 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  KeyRound,
   Copy,
   Check,
   RefreshCw,
   X,
-  ShieldCheck,
   Zap,
-  Sliders,
   Plus,
-  Layers,
   Sparkles,
 } from "lucide-react";
 import {
@@ -28,6 +24,254 @@ interface SecretGeneratorModalProps {
 
 const LENGTH_PRESETS = [24, 36, 48, 64];
 
+interface FormatOption {
+  id: SecretFormat;
+  label: string;
+  sublabel: string;
+}
+
+const FORMAT_OPTIONS: FormatOption[] = [
+  { id: "alphanumeric", label: "Alphanumeric", sublabel: "A-Z, a-z, 0-9" },
+  { id: "hex", label: "Hexadecimal", sublabel: "0-9, a-f (lower)" },
+  { id: "hex-upper", label: "Hex Uppercase", sublabel: "0-9, A-F" },
+  { id: "alphanumeric-symbols", label: "Alpha + Symbols", sublabel: "Includes !@#$%^&*" },
+  { id: "url-safe", label: "URL-Safe Base64", sublabel: "A-Z, a-z, 0-9, -, _" },
+  { id: "uuid", label: "UUID v4", sublabel: "8-4-4-4-12 hex" },
+];
+
+function getStrengthBadgeClass(strength: string): string {
+  if (strength === "Very Strong") {
+    return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30";
+  }
+  if (strength === "Strong") {
+    return "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30";
+  }
+  return "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30";
+}
+
+interface SecretDisplaySectionProps {
+  currentSecret: string;
+  copiedMain: boolean;
+  strengthBadgeClass: string;
+  strengthText: string;
+  bitsText: number;
+  onGenerate: () => void;
+  onCopyMain: () => void;
+}
+
+const SecretDisplaySection: React.FC<SecretDisplaySectionProps> = ({
+  currentSecret,
+  copiedMain,
+  strengthBadgeClass,
+  strengthText,
+  bitsText,
+  onGenerate,
+  onCopyMain,
+}) => (
+  <div className="space-y-2">
+    <div className="flex items-center justify-between">
+      <span className="text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] uppercase tracking-wider">
+        Generated Secret ({currentSecret.length} chars)
+      </span>
+      <div className="flex items-center gap-2">
+        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${strengthBadgeClass}`}>
+          {strengthText} ({bitsText} bits)
+        </span>
+      </div>
+    </div>
+
+    <div className="p-3.5 rounded-xl border border-[#e4e4e7] dark:border-[#3f3f46] bg-[#f4f4f5] dark:bg-[#27272a] flex items-center justify-between gap-3 shadow-inner">
+      <div className="font-mono text-sm sm:text-base font-semibold text-[#09090b] dark:text-[#f4f4f5] break-all select-all flex-1 tracking-wider">
+        {currentSecret}
+      </div>
+      <div className="flex items-center gap-1.5 shrink-0">
+        <button
+          type="button"
+          id="regenerate-secret-btn"
+          onClick={onGenerate}
+          className="p-2 rounded-lg bg-white dark:bg-[#18181b] text-[#52525b] dark:text-[#f4f4f5] hover:text-[#09090b] border border-[#e4e4e7] dark:border-[#3f3f46] transition-colors cursor-pointer hover:bg-[#e4e4e7] dark:hover:bg-[#27272a]"
+          title="Generate another secret"
+        >
+          <RefreshCw className="w-4 h-4 text-[#71717a]" />
+        </button>
+        <button
+          type="button"
+          id="copy-generated-secret-btn"
+          onClick={onCopyMain}
+          className={`px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs ${
+            copiedMain
+              ? "bg-emerald-600 text-white"
+              : "bg-[#09090b] text-white dark:bg-[#f4f4f5] dark:text-[#09090b] hover:bg-zinc-800 dark:hover:bg-zinc-200"
+          }`}
+        >
+          {copiedMain ? (
+            <>
+              <Check className="w-3.5 h-3.5" />
+              <span>Copied!</span>
+            </>
+          ) : (
+            <>
+              <Copy className="w-3.5 h-3.5" />
+              <span>Copy</span>
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
+interface FormatSelectorProps {
+  format: SecretFormat;
+  onChangeFormat: (fmt: SecretFormat) => void;
+}
+
+const FormatSelector: React.FC<FormatSelectorProps> = ({ format, onChangeFormat }) => (
+  <div className="space-y-2">
+    <div className="text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] uppercase tracking-wider block">
+      Format & Character Set
+    </div>
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+      {FORMAT_OPTIONS.map((opt) => {
+        const isSelected = format === opt.id;
+        const btnClass = isSelected
+          ? "border-zinc-800 dark:border-zinc-300 bg-zinc-200/70 dark:bg-zinc-800/80 text-[#09090b] dark:text-[#f4f4f5] font-semibold"
+          : "border-[#e4e4e7] dark:border-[#3f3f46] bg-[#f4f4f5]/50 dark:bg-[#27272a]/50 text-[#52525b] dark:text-[#a1a1aa] hover:bg-[#e4e4e7] dark:hover:bg-[#27272a]";
+
+        return (
+          <button
+            key={opt.id}
+            type="button"
+            onClick={() => onChangeFormat(opt.id)}
+            className={`p-2.5 rounded-xl border text-left text-xs transition-all cursor-pointer ${btnClass}`}
+          >
+            <div className="font-semibold text-xs">{opt.label}</div>
+            <div className="text-[10px] font-mono opacity-75">{opt.sublabel}</div>
+          </button>
+        );
+      })}
+    </div>
+  </div>
+);
+
+interface BatchListProps {
+  batchSecrets: string[];
+  copiedAll: boolean;
+  copiedBatchIndex: number | null;
+  onCopyAll: () => void;
+  onCopySingle: (sec: string, idx: number) => void;
+}
+
+const BatchList: React.FC<BatchListProps> = ({
+  batchSecrets,
+  copiedAll,
+  copiedBatchIndex,
+  onCopyAll,
+  onCopySingle,
+}) => (
+  <div className="space-y-2 pt-2 border-t border-[#e4e4e7] dark:border-[#27272a]">
+    <div className="flex items-center justify-between text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa]">
+      <span>Batch of {batchSecrets.length} Secrets</span>
+      <button
+        type="button"
+        onClick={onCopyAll}
+        className="text-[11px] text-[#09090b] dark:text-[#f4f4f5] hover:underline flex items-center gap-1 cursor-pointer"
+      >
+        {copiedAll ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+        <span>{copiedAll ? "Copied All!" : "Copy All (newlines)"}</span>
+      </button>
+    </div>
+    <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">
+      {batchSecrets.map((sec, idx) => (
+        <div
+          key={`batch-item-${idx}-${sec.slice(0, 8)}`}
+          className="p-2 rounded-lg bg-white dark:bg-[#18181b] border border-[#e4e4e7] dark:border-[#3f3f46] flex items-center justify-between gap-2 text-xs font-mono"
+        >
+          <span className="truncate text-[#09090b] dark:text-[#f4f4f5]">{sec}</span>
+          <button
+            type="button"
+            onClick={() => onCopySingle(sec, idx)}
+            className="p-1 text-[#71717a] hover:text-[#09090b] dark:text-[#a1a1aa] dark:hover:text-[#f4f4f5] rounded cursor-pointer shrink-0"
+            title="Copy this secret"
+          >
+            {copiedBatchIndex === idx ? (
+              <Check className="w-3.5 h-3.5 text-emerald-400" />
+            ) : (
+              <Copy className="w-3.5 h-3.5" />
+            )}
+          </button>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+interface SecretGeneratorFooterProps {
+  currentSecret: string;
+  onSelectSecret?: (secret: string) => void;
+  onUseInNewKey?: (secret: string) => void;
+  onClose: () => void;
+}
+
+const SecretGeneratorFooter: React.FC<SecretGeneratorFooterProps> = ({
+  currentSecret,
+  onSelectSecret,
+  onUseInNewKey,
+  onClose,
+}) => {
+  const renderActionBtn = () => {
+    if (onSelectSecret) {
+      return (
+        <button
+          type="button"
+          id="insert-secret-into-form-btn"
+          onClick={() => {
+            onSelectSecret(currentSecret);
+            onClose();
+          }}
+          className="px-4 py-2 rounded-xl bg-[#09090b] hover:bg-zinc-800 text-white dark:bg-[#f4f4f5] dark:text-[#09090b] dark:hover:bg-zinc-200 text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+        >
+          <Zap className="w-3.5 h-3.5" />
+          <span>Use In Form</span>
+        </button>
+      );
+    }
+    if (onUseInNewKey) {
+      return (
+        <button
+          type="button"
+          id="use-secret-in-new-key-btn"
+          onClick={() => {
+            onUseInNewKey(currentSecret);
+            onClose();
+          }}
+          className="px-4 py-2 rounded-xl bg-[#09090b] hover:bg-zinc-800 text-white dark:bg-[#f4f4f5] dark:text-[#09090b] dark:hover:bg-zinc-200 text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>Create Key with this Secret</span>
+        </button>
+      );
+    }
+    return <div />;
+  };
+
+  return (
+    <div className="px-6 py-3.5 border-t border-[#e4e4e7] dark:border-[#27272a] bg-[#f4f4f5] dark:bg-[#18181b] flex items-center justify-between gap-2">
+      {renderActionBtn()}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          id="done-secret-generator-btn"
+          onClick={onClose}
+          className="px-4 py-2 rounded-xl bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-xs font-medium transition-colors cursor-pointer"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  );
+};
+
 export const SecretGeneratorModal: React.FC<SecretGeneratorModalProps> = ({
   isOpen,
   onClose,
@@ -36,7 +280,6 @@ export const SecretGeneratorModal: React.FC<SecretGeneratorModalProps> = ({
 }) => {
   const [length, setLength] = useState<number>(36);
   const [format, setFormat] = useState<SecretFormat>("alphanumeric");
-  const [prefix, setPrefix] = useState<string>("hl_live_");
   const [includeHyphens, setIncludeHyphens] = useState<boolean>(false);
   const [currentSecret, setCurrentSecret] = useState<string>("");
   const [batchCount, setBatchCount] = useState<number>(1);
@@ -49,7 +292,6 @@ export const SecretGeneratorModal: React.FC<SecretGeneratorModalProps> = ({
     const opts: SecretGeneratorOptions = {
       length,
       format,
-      prefix: format === "homelab-prefixed" ? prefix : undefined,
       includeHyphens,
     };
 
@@ -66,17 +308,18 @@ export const SecretGeneratorModal: React.FC<SecretGeneratorModalProps> = ({
     } else {
       setBatchSecrets([]);
     }
-  }, [length, format, prefix, includeHyphens, batchCount]);
+  }, [length, format, includeHyphens, batchCount]);
 
   useEffect(() => {
     if (isOpen) {
       handleGenerate();
     }
-  }, [isOpen, length, format, includeHyphens, batchCount]);
+  }, [isOpen, length, format, includeHyphens, batchCount, handleGenerate]);
 
   if (!isOpen) return null;
 
   const entropy = calculateEntropy(currentSecret, format);
+  const strengthBadgeClass = getStrengthBadgeClass(entropy.strength);
 
   const copyToClipboard = async (text: string, type: "main" | "batch" | "all", index?: number) => {
     try {
@@ -118,6 +361,7 @@ export const SecretGeneratorModal: React.FC<SecretGeneratorModalProps> = ({
             </div>
           </div>
           <button
+            type="button"
             id="close-secret-generator-btn"
             onClick={onClose}
             className="p-1.5 text-[#71717a] hover:text-[#09090b] dark:text-[#a1a1aa] dark:hover:text-[#f4f4f5] rounded-lg hover:bg-[#e4e4e7] dark:hover:bg-[#27272a] transition-colors cursor-pointer"
@@ -128,76 +372,27 @@ export const SecretGeneratorModal: React.FC<SecretGeneratorModalProps> = ({
 
         {/* Content Body */}
         <div className="p-6 overflow-y-auto space-y-5 flex-1">
-          {/* Main Display Box */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] uppercase tracking-wider">
-                Generated Secret ({currentSecret.length} chars)
-              </label>
-              <div className="flex items-center gap-2">
-                <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
-                    entropy.strength === "Very Strong"
-                      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
-                      : entropy.strength === "Strong"
-                      ? "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30"
-                      : "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30"
-                  }`}
-                >
-                  {entropy.strength} ({entropy.bits} bits)
-                </span>
-              </div>
-            </div>
-
-            {/* Secret Value Display Box */}
-            <div className="p-3.5 rounded-xl border border-[#e4e4e7] dark:border-[#3f3f46] bg-[#f4f4f5] dark:bg-[#27272a] flex items-center justify-between gap-3 shadow-inner">
-              <div className="font-mono text-sm sm:text-base font-semibold text-[#09090b] dark:text-[#f4f4f5] break-all select-all flex-1 tracking-wider">
-                {currentSecret}
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  id="regenerate-secret-btn"
-                  onClick={handleGenerate}
-                  className="p-2 rounded-lg bg-white dark:bg-[#18181b] text-[#52525b] dark:text-[#f4f4f5] hover:text-[#09090b] border border-[#e4e4e7] dark:border-[#3f3f46] transition-colors cursor-pointer hover:bg-[#e4e4e7] dark:hover:bg-[#27272a]"
-                  title="Generate another secret"
-                >
-                  <RefreshCw className="w-4 h-4 text-[#71717a]" />
-                </button>
-                <button
-                  id="copy-generated-secret-btn"
-                  onClick={() => copyToClipboard(currentSecret, "main")}
-                  className={`px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs ${
-                    copiedMain
-                      ? "bg-emerald-600 text-white"
-                      : "bg-[#09090b] text-white dark:bg-[#f4f4f5] dark:text-[#09090b] hover:bg-zinc-800 dark:hover:bg-zinc-200"
-                  }`}
-                >
-                  {copiedMain ? (
-                    <>
-                      <Check className="w-3.5 h-3.5" />
-                      <span>Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Copy</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
+          <SecretDisplaySection
+            currentSecret={currentSecret}
+            copiedMain={copiedMain}
+            strengthBadgeClass={strengthBadgeClass}
+            strengthText={entropy.strength}
+            bitsText={entropy.bits}
+            onGenerate={handleGenerate}
+            onCopyMain={() => copyToClipboard(currentSecret, "main")}
+          />
 
           {/* Preset Lengths */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] uppercase tracking-wider">
+              <label htmlFor="custom-length-slider" className="text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] uppercase tracking-wider">
                 Length ({length} characters)
               </label>
               <div className="flex items-center gap-1.5">
                 {LENGTH_PRESETS.map((preset) => (
                   <button
                     key={preset}
+                    type="button"
                     id={`length-preset-${preset}-btn`}
                     onClick={() => setLength(preset)}
                     className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
@@ -228,96 +423,11 @@ export const SecretGeneratorModal: React.FC<SecretGeneratorModalProps> = ({
             </div>
           </div>
 
-          {/* Format / Character Sets Selection */}
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] uppercase tracking-wider block">
-              Format & Character Set
-            </label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => setFormat("alphanumeric")}
-                className={`p-2.5 rounded-xl border text-left text-xs transition-all cursor-pointer ${
-                  format === "alphanumeric"
-                    ? "border-zinc-800 dark:border-zinc-300 bg-zinc-200/70 dark:bg-zinc-800/80 text-[#09090b] dark:text-[#f4f4f5] font-semibold"
-                    : "border-[#e4e4e7] dark:border-[#3f3f46] bg-[#f4f4f5]/50 dark:bg-[#27272a]/50 text-[#52525b] dark:text-[#a1a1aa] hover:bg-[#e4e4e7] dark:hover:bg-[#27272a]"
-                }`}
-              >
-                <div className="font-semibold text-xs">Alphanumeric</div>
-                <div className="text-[10px] font-mono opacity-75">A-Z, a-z, 0-9</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setFormat("hex")}
-                className={`p-2.5 rounded-xl border text-left text-xs transition-all cursor-pointer ${
-                  format === "hex"
-                    ? "border-zinc-800 dark:border-zinc-300 bg-zinc-200/70 dark:bg-zinc-800/80 text-[#09090b] dark:text-[#f4f4f5] font-semibold"
-                    : "border-[#e4e4e7] dark:border-[#3f3f46] bg-[#f4f4f5]/50 dark:bg-[#27272a]/50 text-[#52525b] dark:text-[#a1a1aa] hover:bg-[#e4e4e7] dark:hover:bg-[#27272a]"
-                }`}
-              >
-                <div className="font-semibold text-xs">Hexadecimal</div>
-                <div className="text-[10px] font-mono opacity-75">0-9, a-f (lower)</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setFormat("hex-upper")}
-                className={`p-2.5 rounded-xl border text-left text-xs transition-all cursor-pointer ${
-                  format === "hex-upper"
-                    ? "border-zinc-800 dark:border-zinc-300 bg-zinc-200/70 dark:bg-zinc-800/80 text-[#09090b] dark:text-[#f4f4f5] font-semibold"
-                    : "border-[#e4e4e7] dark:border-[#3f3f46] bg-[#f4f4f5]/50 dark:bg-[#27272a]/50 text-[#52525b] dark:text-[#a1a1aa] hover:bg-[#e4e4e7] dark:hover:bg-[#27272a]"
-                }`}
-              >
-                <div className="font-semibold text-xs">Hex Uppercase</div>
-                <div className="text-[10px] font-mono opacity-75">0-9, A-F</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setFormat("alphanumeric-symbols")}
-                className={`p-2.5 rounded-xl border text-left text-xs transition-all cursor-pointer ${
-                  format === "alphanumeric-symbols"
-                    ? "border-zinc-800 dark:border-zinc-300 bg-zinc-200/70 dark:bg-zinc-800/80 text-[#09090b] dark:text-[#f4f4f5] font-semibold"
-                    : "border-[#e4e4e7] dark:border-[#3f3f46] bg-[#f4f4f5]/50 dark:bg-[#27272a]/50 text-[#52525b] dark:text-[#a1a1aa] hover:bg-[#e4e4e7] dark:hover:bg-[#27272a]"
-                }`}
-              >
-                <div className="font-semibold text-xs">Alpha + Symbols</div>
-                <div className="text-[10px] font-mono opacity-75">Includes !@#$%^&*</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setFormat("url-safe")}
-                className={`p-2.5 rounded-xl border text-left text-xs transition-all cursor-pointer ${
-                  format === "url-safe"
-                    ? "border-zinc-800 dark:border-zinc-300 bg-zinc-200/70 dark:bg-zinc-800/80 text-[#09090b] dark:text-[#f4f4f5] font-semibold"
-                    : "border-[#e4e4e7] dark:border-[#3f3f46] bg-[#f4f4f5]/50 dark:bg-[#27272a]/50 text-[#52525b] dark:text-[#a1a1aa] hover:bg-[#e4e4e7] dark:hover:bg-[#27272a]"
-                }`}
-              >
-                <div className="font-semibold text-xs">URL-Safe Base64</div>
-                <div className="text-[10px] font-mono opacity-75">A-Z, a-z, 0-9, -, _</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setFormat("uuid")}
-                className={`p-2.5 rounded-xl border text-left text-xs transition-all cursor-pointer ${
-                  format === "uuid"
-                    ? "border-zinc-800 dark:border-zinc-300 bg-zinc-200/70 dark:bg-zinc-800/80 text-[#09090b] dark:text-[#f4f4f5] font-semibold"
-                    : "border-[#e4e4e7] dark:border-[#3f3f46] bg-[#f4f4f5]/50 dark:bg-[#27272a]/50 text-[#52525b] dark:text-[#a1a1aa] hover:bg-[#e4e4e7] dark:hover:bg-[#27272a]"
-                }`}
-              >
-                <div className="font-semibold text-xs">UUID v4</div>
-                <div className="text-[10px] font-mono opacity-75">8-4-4-4-12 hex</div>
-              </button>
-            </div>
-          </div>
+          <FormatSelector format={format} onChangeFormat={setFormat} />
 
           {/* Optional Formatting & Batch Options */}
           <div className="p-3.5 rounded-xl bg-[#f4f4f5]/70 dark:bg-[#27272a]/70 border border-[#e4e4e7] dark:border-[#27272a] space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              {/* Include hyphens */}
               <label className="flex items-center gap-2 text-xs font-medium text-[#09090b] dark:text-[#f4f4f5] cursor-pointer">
                 <input
                   type="checkbox"
@@ -328,13 +438,13 @@ export const SecretGeneratorModal: React.FC<SecretGeneratorModalProps> = ({
                 <span>Chunk with Hyphens (Readability)</span>
               </label>
 
-              {/* Batch count */}
               <div className="flex items-center gap-2">
                 <span className="text-xs text-[#71717a] dark:text-[#a1a1aa]">Batch:</span>
                 <div className="flex items-center bg-white dark:bg-[#18181b] p-0.5 rounded-lg border border-[#e4e4e7] dark:border-[#3f3f46]">
                   {[1, 5, 10].map((count) => (
                     <button
                       key={count}
+                      type="button"
                       onClick={() => setBatchCount(count)}
                       className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
                         batchCount === count
@@ -349,85 +459,25 @@ export const SecretGeneratorModal: React.FC<SecretGeneratorModalProps> = ({
               </div>
             </div>
 
-            {/* Batch Results if count > 1 */}
             {batchCount > 1 && batchSecrets.length > 0 && (
-              <div className="space-y-2 pt-2 border-t border-[#e4e4e7] dark:border-[#27272a]">
-                <div className="flex items-center justify-between text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa]">
-                  <span>Batch of {batchSecrets.length} Secrets</span>
-                  <button
-                    onClick={() => copyToClipboard(batchSecrets.join("\n"), "all")}
-                    className="text-[11px] text-[#09090b] dark:text-[#f4f4f5] hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    {copiedAll ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                    <span>{copiedAll ? "Copied All!" : "Copy All (newlines)"}</span>
-                  </button>
-                </div>
-                <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">
-                  {batchSecrets.map((sec, idx) => (
-                    <div
-                      key={idx}
-                      className="p-2 rounded-lg bg-white dark:bg-[#18181b] border border-[#e4e4e7] dark:border-[#3f3f46] flex items-center justify-between gap-2 text-xs font-mono"
-                    >
-                      <span className="truncate text-[#09090b] dark:text-[#f4f4f5]">{sec}</span>
-                      <button
-                        onClick={() => copyToClipboard(sec, "batch", idx)}
-                        className="p-1 text-[#71717a] hover:text-[#09090b] dark:text-[#a1a1aa] dark:hover:text-[#f4f4f5] rounded cursor-pointer shrink-0"
-                        title="Copy this secret"
-                      >
-                        {copiedBatchIndex === idx ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        ) : (
-                          <Copy className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <BatchList
+                batchSecrets={batchSecrets}
+                copiedAll={copiedAll}
+                copiedBatchIndex={copiedBatchIndex}
+                onCopyAll={() => copyToClipboard(batchSecrets.join("\n"), "all")}
+                onCopySingle={(sec, idx) => copyToClipboard(sec, "batch", idx)}
+              />
             )}
           </div>
         </div>
 
         {/* Footer Actions */}
-        <div className="px-6 py-3.5 border-t border-[#e4e4e7] dark:border-[#27272a] bg-[#f4f4f5] dark:bg-[#18181b] flex items-center justify-between gap-2">
-          {onSelectSecret ? (
-            <button
-              id="insert-secret-into-form-btn"
-              onClick={() => {
-                onSelectSecret(currentSecret);
-                onClose();
-              }}
-              className="px-4 py-2 rounded-xl bg-[#09090b] hover:bg-zinc-800 text-white dark:bg-[#f4f4f5] dark:text-[#09090b] dark:hover:bg-zinc-200 text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
-            >
-              <Zap className="w-3.5 h-3.5" />
-              <span>Use In Form</span>
-            </button>
-          ) : onUseInNewKey ? (
-            <button
-              id="use-secret-in-new-key-btn"
-              onClick={() => {
-                onUseInNewKey(currentSecret);
-                onClose();
-              }}
-              className="px-4 py-2 rounded-xl bg-[#09090b] hover:bg-zinc-800 text-white dark:bg-[#f4f4f5] dark:text-[#09090b] dark:hover:bg-zinc-200 text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Create Key with this Secret</span>
-            </button>
-          ) : (
-            <div />
-          )}
-
-          <div className="flex items-center gap-2">
-            <button
-              id="done-secret-generator-btn"
-              onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-xs font-medium transition-colors cursor-pointer"
-            >
-              Close
-            </button>
-          </div>
-        </div>
+        <SecretGeneratorFooter
+          currentSecret={currentSecret}
+          onSelectSecret={onSelectSecret}
+          onUseInNewKey={onUseInNewKey}
+          onClose={onClose}
+        />
       </div>
     </div>
   );

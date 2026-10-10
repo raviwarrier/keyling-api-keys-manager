@@ -3,13 +3,10 @@ import {
   FieldVisibilitySettings,
   OptionalFieldKey,
   ColumnKey,
-  ApiKeyItem,
 } from "../types";
 import {
   FIELD_CONFIGS,
   VISIBILITY_PRESETS,
-  DEFAULT_COLUMN_ORDER,
-  DEFAULT_ENVIRONMENTS,
 } from "../constants/fieldConfig";
 import { EnvironmentBadge } from "./EnvironmentBadge";
 import {
@@ -104,7 +101,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   if (!isOpen) return null;
 
   const categories = ["General", "Security & Access", "Dates & Lifecycle", "Contact & Notes"] as const;
-  const totalOptional = FIELD_CONFIGS.length;
   const activeOptionalCount = Object.values(visibility).filter(Boolean).length;
 
   const getColumnLabel = (key: ColumnKey): string => {
@@ -190,12 +186,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         const items = Array.isArray(data) ? data : data.items || data.keys;
 
         if (!Array.isArray(items)) {
-          throw new Error("JSON must contain an array of API key objects.");
+          throw new TypeError("JSON must contain an array of API key objects.");
         }
 
         const validItems = items.filter((k) => k.app_name && k.key_value);
         if (validItems.length === 0) {
-          throw new Error("No valid keys with 'app_name' and 'key_value' found in the JSON file.");
+          throw new TypeError("No valid keys with 'app_name' and 'key_value' found in the JSON file.");
         }
 
         setParsedItems(validItems);
@@ -421,11 +417,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       {fieldsInCategory.map((field) => {
                         const isVisible = visibility[field.key];
                         return (
-                          <div
+                          <button
                             key={field.key}
+                            type="button"
+                            role="switch"
+                            aria-checked={isVisible}
                             onClick={() => onToggleField(field.key)}
                             id={`toggle-field-wrapper-${field.key}`}
-                            className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between select-none ${
+                            className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between select-none text-left w-full ${
                               isVisible
                                 ? "bg-white dark:bg-[#27272a] border-zinc-400 dark:border-zinc-600 shadow-xs"
                                 : "bg-[#f4f4f5]/40 dark:bg-[#18181b]/60 border-[#e4e4e7] dark:border-[#27272a] opacity-60 hover:opacity-80"
@@ -441,27 +440,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               </div>
                             </div>
 
-                            <button
-                              type="button"
-                              role="switch"
-                              aria-checked={isVisible}
+                            <span
+                              aria-hidden="true"
                               id={`toggle-switch-${field.key}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onToggleField(field.key);
-                              }}
-                              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                              className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out pointer-events-none ${
                                 isVisible ? "bg-[#09090b] dark:bg-[#f4f4f5]" : "bg-zinc-300 dark:bg-zinc-700"
                               }`}
                             >
                               <span
-                                aria-hidden="true"
                                 className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white dark:bg-[#09090b] shadow-sm ring-0 transition duration-200 ease-in-out ${
                                   isVisible ? "translate-x-4" : "translate-x-0"
                                 }`}
                               />
-                            </button>
-                          </div>
+                            </span>
+                          </button>
                         );
                       })}
                     </div>
@@ -624,7 +616,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             value={editingEnv.newName}
                             onChange={(e) => setEditingEnv({ ...editingEnv, newName: e.target.value })}
                             className="w-full px-2.5 py-1 rounded-lg border border-zinc-400 dark:border-zinc-500 bg-zinc-50 dark:bg-zinc-800 text-xs font-medium"
-                            autoFocus
                           />
                           <button
                             type="button"
@@ -764,21 +755,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                 )}
 
-                <div
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json"
+                  onChange={(e) => {
+                    if (e.target.files?.[0]) {
+                      handleFileChange(e.target.files[0]);
+                    }
+                  }}
+                  className="hidden"
+                />
+                <button
+                  type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-[#e4e4e7] dark:border-[#3f3f46] hover:border-zinc-500 dark:hover:border-zinc-400 rounded-2xl p-6 text-center cursor-pointer transition-colors bg-[#f4f4f5]/30 dark:bg-[#18181b]/30 flex flex-col items-center justify-center gap-2"
+                  className="w-full border-2 border-dashed border-[#e4e4e7] dark:border-[#3f3f46] hover:border-zinc-500 dark:hover:border-zinc-400 rounded-2xl p-6 text-center cursor-pointer transition-colors bg-[#f4f4f5]/30 dark:bg-[#18181b]/30 flex flex-col items-center justify-center gap-2"
                 >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".json"
-                    onChange={(e) => {
-                      if (e.target.files?.[0]) {
-                        handleFileChange(e.target.files[0]);
-                      }
-                    }}
-                    className="hidden"
-                  />
                   <Upload className="w-6 h-6 text-zinc-400" />
                   <div className="text-xs font-medium text-[#09090b] dark:text-[#f4f4f5]">
                     {importFile ? importFile.name : "Click to browse or drop backup JSON file"}
@@ -786,7 +778,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <span className="text-[10px] text-[#71717a] dark:text-[#a1a1aa]">
                     Accepts export files from Keyling (.json)
                   </span>
-                </div>
+                </button>
 
                 {parsedItems && (
                   <div className="p-4 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-[#f4f4f5]/80 dark:bg-[#27272a]/80 space-y-3">
@@ -798,9 +790,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-medium text-[#52525b] dark:text-[#a1a1aa] block">
+                      <span className="text-[11px] font-medium text-[#52525b] dark:text-[#a1a1aa] block">
                         Import Strategy:
-                      </label>
+                      </span>
                       <div className="grid grid-cols-2 gap-2">
                         <button
                           type="button"

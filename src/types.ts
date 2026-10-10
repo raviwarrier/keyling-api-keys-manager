@@ -11,7 +11,7 @@ export interface ApiKeyItem {
   project?: string | null;
   environment?: string | null;
   last_used_date?: string | null;
-  status: 'Active' | 'Revoked' | 'Paused' | string;
+  status: 'Active' | 'Revoked' | 'Paused';
   ip_restrictions?: string | null;
   portal_url?: string | null;
   creator_contact?: string | null;

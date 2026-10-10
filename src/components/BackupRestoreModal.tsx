@@ -24,34 +24,30 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleFileChange = (file: File) => {
+  const handleFileChange = async (file: File) => {
     setImportFile(file);
     setParseError(null);
     setSuccessMsg(null);
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const text = e.target?.result as string;
-        const data = JSON.parse(text);
-        const items = Array.isArray(data) ? data : data.items || data.keys;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      const items = Array.isArray(data) ? data : data.items || data.keys;
 
-        if (!Array.isArray(items)) {
-          throw new Error("JSON must contain an array of API key objects.");
-        }
-
-        const validItems = items.filter((k) => k.app_name && k.key_value);
-        if (validItems.length === 0) {
-          throw new Error("No valid keys with 'app_name' and 'key_value' found in the JSON file.");
-        }
-
-        setParsedItems(validItems);
-      } catch (err: any) {
-        setParseError(err.message || "Failed to parse JSON file.");
-        setParsedItems(null);
+      if (!Array.isArray(items)) {
+        throw new TypeError("JSON must contain an array of API key objects.");
       }
-    };
-    reader.readAsText(file);
+
+      const validItems = items.filter((k) => k.app_name && k.key_value);
+      if (validItems.length === 0) {
+        throw new Error("No valid keys with 'app_name' and 'key_value' found in the JSON file.");
+      }
+
+      setParsedItems(validItems);
+    } catch (err: any) {
+      setParseError(err.message || "Failed to parse JSON file.");
+      setParsedItems(null);
+    }
   };
 
   const handleImport = async () => {
@@ -175,29 +171,31 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
               Restore from JSON Backup
             </h3>
 
-            {/* Dropzone */}
-            <div
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json,application/json"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  void handleFileChange(file);
+                }
+              }}
+            />
+            <button
+              type="button"
               onClick={() => fileInputRef.current?.click()}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
                 e.preventDefault();
-                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                  handleFileChange(e.dataTransfer.files[0]);
+                const file = e.dataTransfer.files?.[0];
+                if (file) {
+                  void handleFileChange(file);
                 }
               }}
-              className="border-2 border-dashed border-[#e4e4e7] dark:border-[#27272a] hover:border-zinc-400 dark:hover:border-zinc-600 rounded-2xl p-5 text-center cursor-pointer transition-colors bg-[#f4f4f5]/50 dark:bg-[#27272a]/40"
+              className="w-full border-2 border-dashed border-[#e4e4e7] dark:border-[#27272a] hover:border-zinc-400 dark:hover:border-zinc-600 rounded-2xl p-5 text-center cursor-pointer transition-colors bg-[#f4f4f5]/50 dark:bg-[#27272a]/40"
             >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".json,application/json"
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files && e.target.files[0]) {
-                    handleFileChange(e.target.files[0]);
-                  }
-                }}
-              />
               <FileJson className="w-8 h-8 text-[#71717a] dark:text-[#a1a1aa] mx-auto mb-2" />
               <p className="text-xs font-medium text-[#09090b] dark:text-[#f4f4f5]">
                 {importFile ? importFile.name : "Click or drag & drop backup JSON here"}
@@ -205,7 +203,7 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
               <p className="text-[11px] text-[#71717a] dark:text-[#a1a1aa] mt-0.5">
                 Supports homelab JSON export array format
               </p>
-            </div>
+            </button>
 
             {parseError && (
               <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 text-xs text-red-700 dark:text-red-300 flex items-center gap-2">
@@ -233,12 +231,14 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[11px] font-semibold text-[#71717a] dark:text-[#a1a1aa] uppercase tracking-wider block">
+                  <span id="restore-strategy-label" className="text-[11px] font-semibold text-[#71717a] dark:text-[#a1a1aa] uppercase tracking-wider block">
                     Restore Strategy
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
+                  </span>
+                  <div role="radiogroup" aria-labelledby="restore-strategy-label" className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
+                      role="radio"
+                      aria-checked={importMode === "merge"}
                       onClick={() => setImportMode("merge")}
                       className={`p-2.5 rounded-xl border text-left text-xs transition-all cursor-pointer ${
                         importMode === "merge"
@@ -252,6 +252,8 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
 
                     <button
                       type="button"
+                      role="radio"
+                      aria-checked={importMode === "replace"}
                       onClick={() => setImportMode("replace")}
                       className={`p-2.5 rounded-xl border text-left text-xs transition-all cursor-pointer ${
                         importMode === "replace"

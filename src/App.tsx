@@ -26,12 +26,7 @@ import {
   CheckCircle2,
   PauseCircle,
   XCircle,
-  Download,
-  SlidersHorizontal,
   RefreshCw,
-  Plus,
-  Server,
-  Layers,
 } from "lucide-react";
 
 // Helper to safely parse various date string representations for expiry calculations
@@ -41,10 +36,23 @@ const parseExpiryDate = (dateStr?: string | null): Date | null => {
   if (!trimmed) return null;
   if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
     const d = new Date(`${trimmed}T23:59:59`);
-    return isNaN(d.getTime()) ? null : d;
+    return Number.isNaN(d.getTime()) ? null : d;
   }
   const d = new Date(trimmed);
-  return isNaN(d.getTime()) ? null : d;
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+// Safe sanitizers to prevent Browser Storage Poisoning (tssecurity:S8475)
+const sanitizeEnvironmentString = (val: unknown): string => {
+  if (typeof val !== "string") return "";
+  return val.replace(/[^\w\s-]/g, "").trim().slice(0, 50);
+};
+
+const sanitizeEnvironmentList = (items: unknown): string[] => {
+  if (!Array.isArray(items)) return [];
+  return items
+    .map((item) => sanitizeEnvironmentString(item))
+    .filter((item): item is string => item.length > 0);
 };
 
 export default function App() {
@@ -91,20 +99,21 @@ export default function App() {
     return DEFAULT_COLUMN_ORDER;
   });
 
-  // Dynamic Environment Labels (Persisted in localStorage)
+  // Dynamic Environment Labels (Persisted in localStorage with sanitization)
   const [environments, setEnvironments] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem("homelab_keys_custom_environments");
       if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+        const parsed: unknown = JSON.parse(saved);
+        const validated = sanitizeEnvironmentList(parsed);
+        if (validated.length > 0) {
+          return validated;
         }
       }
     } catch (e) {
       console.warn("Failed to load environments from localStorage:", e);
     }
-    return DEFAULT_ENVIRONMENTS;
+    return [...DEFAULT_ENVIRONMENTS];
   });
 
   // Data State
@@ -155,7 +164,9 @@ export default function App() {
     message?: string,
     duration = 3500
   ) => {
-    const id = Math.random().toString(36).substring(2, 9);
+    const id = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : Date.now().toString(36);
     setToasts((prev) => [...prev, { id, type, title, message }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -265,28 +276,39 @@ export default function App() {
     addToast("info", "Column Order Reset", "Restored default table column arrangement.");
   };
 
-  // Environment operations
+  // Environment operations (Sanitized to prevent Browser Storage Poisoning)
   const handleAddEnvironment = (name: string) => {
-    const updated = [...environments, name];
+    const cleanName = sanitizeEnvironmentString(name);
+    if (!cleanName) return;
+
+    const currentClean = sanitizeEnvironmentList(environments);
+    if (currentClean.includes(cleanName)) return;
+
+    const updated = [...currentClean, cleanName];
     setEnvironments(updated);
     localStorage.setItem("homelab_keys_custom_environments", JSON.stringify(updated));
-    addToast("success", "Environment Added", `Added environment label "${name}"`);
+    addToast("success", "Environment Added", `Added environment label "${cleanName}"`);
   };
 
   const handleUpdateEnvironment = async (oldName: string, newName: string) => {
-    const updated = environments.map((e) => (e === oldName ? newName : e));
+    const cleanOld = sanitizeEnvironmentString(oldName);
+    const cleanNew = sanitizeEnvironmentString(newName);
+    if (!cleanOld || !cleanNew) return;
+
+    const currentClean = sanitizeEnvironmentList(environments);
+    const updated = currentClean.map((e) => (e === cleanOld ? cleanNew : e));
     setEnvironments(updated);
     localStorage.setItem("homelab_keys_custom_environments", JSON.stringify(updated));
 
     // Also update any keys that were using the old environment name in SQLite
-    const keysWithOldEnv = keys.filter((k) => k.environment === oldName);
+    const keysWithOldEnv = keys.filter((k) => k.environment === cleanOld);
     if (keysWithOldEnv.length > 0) {
       try {
         for (const k of keysWithOldEnv) {
           await fetch(`/api/keys/${k.id}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ environment: newName }),
+            body: JSON.stringify({ environment: cleanNew }),
           });
         }
         fetchKeys();
@@ -296,26 +318,29 @@ export default function App() {
       }
     }
 
-    if (environmentFilter === oldName) {
-      setEnvironmentFilter(newName);
+    if (environmentFilter === cleanOld) {
+      setEnvironmentFilter(cleanNew);
     }
 
-    addToast("success", "Environment Renamed", `Renamed "${oldName}" to "${newName}"`);
+    addToast("success", "Environment Renamed", `Renamed "${cleanOld}" to "${cleanNew}"`);
   };
 
   const handleDeleteEnvironment = (name: string) => {
-    const updated = environments.filter((e) => e !== name);
+    const cleanTarget = sanitizeEnvironmentString(name);
+    const currentClean = sanitizeEnvironmentList(environments);
+    const updated = currentClean.filter((e) => e !== cleanTarget);
     setEnvironments(updated);
     localStorage.setItem("homelab_keys_custom_environments", JSON.stringify(updated));
-    if (environmentFilter === name) {
+    if (environmentFilter === cleanTarget) {
       setEnvironmentFilter("All");
     }
-    addToast("info", "Environment Deleted", `Removed environment label "${name}"`);
+    addToast("info", "Environment Deleted", `Removed environment label "${cleanTarget}"`);
   };
 
   const handleResetEnvironments = () => {
-    setEnvironments(DEFAULT_ENVIRONMENTS);
-    localStorage.setItem("homelab_keys_custom_environments", JSON.stringify(DEFAULT_ENVIRONMENTS));
+    const defaultList = [...DEFAULT_ENVIRONMENTS];
+    setEnvironments(defaultList);
+    localStorage.setItem("homelab_keys_custom_environments", JSON.stringify(defaultList));
     addToast("info", "Environments Reset", "Restored default environment labels list.");
   };
 
@@ -343,7 +368,7 @@ export default function App() {
         data = data.filter((k) => {
           if (!k.expiry_date || k.status === "Revoked") return false;
           const exp = new Date(k.expiry_date);
-          return !isNaN(exp.getTime()) && exp >= now && exp <= sevenDays;
+          return !Number.isNaN(exp.getTime()) && exp >= now && exp <= sevenDays;
         });
       }
 
@@ -560,6 +585,93 @@ export default function App() {
     setIsSettingsModalOpen(true);
   };
 
+  const renderMainView = () => {
+    if (loading) {
+      return (
+        <div className="p-12 text-center text-[#71717a] dark:text-[#a1a1aa] bg-white dark:bg-[#18181b] border border-[#e4e4e7] dark:border-[#27272a] rounded-2xl">
+          <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-[#71717a]" />
+          <p className="text-xs">Loading homelab registry...</p>
+        </div>
+      );
+    }
+
+    if (viewMode === "table") {
+      return (
+        <div className="space-y-4">
+          {/* Desktop Table with Custom Column Order & Sticky Actions */}
+          <div className="hidden lg:block">
+            <KeyTable
+              keys={keys}
+              visibility={visibility}
+              columnOrder={columnOrder}
+              onReorderColumns={handleReorderColumns}
+              revealedKeys={revealedKeys}
+              onToggleReveal={handleToggleReveal}
+              onCopyKey={handleCopyKey}
+              onEdit={(item) => {
+                setEditingKey(item);
+                setIsKeyModalOpen(true);
+              }}
+              onDelete={handleDeleteRequest}
+              onClone={handleClone}
+              onTouch={handleTouch}
+              onViewDetails={(item) => setDetailsKey(item)}
+              copiedId={copiedId}
+              selectedIds={selectedIds}
+              onToggleSelect={handleToggleSelect}
+              onSelectAll={handleSelectAll}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+              onSortChange={handleSortChange}
+            />
+          </div>
+          {/* Mobile / Tablet Responsive Fallback */}
+          <div className="lg:hidden">
+            <KeyCards
+              keys={keys}
+              visibility={visibility}
+              revealedKeys={revealedKeys}
+              onToggleReveal={handleToggleReveal}
+              onCopyKey={handleCopyKey}
+              onEdit={(item) => {
+                setEditingKey(item);
+                setIsKeyModalOpen(true);
+              }}
+              onDelete={handleDeleteRequest}
+              onClone={handleClone}
+              onTouch={handleTouch}
+              onViewDetails={(item) => setDetailsKey(item)}
+              copiedId={copiedId}
+              selectedIds={selectedIds}
+              onToggleSelect={handleToggleSelect}
+            />
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <KeyCards
+        keys={keys}
+        visibility={visibility}
+        revealedKeys={revealedKeys}
+        onToggleReveal={handleToggleReveal}
+        onCopyKey={handleCopyKey}
+        onEdit={(item) => {
+          setEditingKey(item);
+          setIsKeyModalOpen(true);
+        }}
+        onDelete={handleDeleteRequest}
+        onClone={handleClone}
+        onTouch={handleTouch}
+        onViewDetails={(item) => setDetailsKey(item)}
+        copiedId={copiedId}
+        selectedIds={selectedIds}
+        onToggleSelect={handleToggleSelect}
+      />
+    );
+  };
+
   return (
     <div className="min-h-screen bg-[#fafafa] dark:bg-[#121214] text-[#09090b] dark:text-[#f4f4f5] flex flex-col font-sans transition-colors duration-150 selection:bg-zinc-300 dark:selection:bg-zinc-700">
       <ToastContainer toasts={toasts} onRemove={removeToast} />
@@ -677,82 +789,7 @@ export default function App() {
         </div>
 
         {/* Primary View (Table or Responsive Card Grid) */}
-        {loading ? (
-          <div className="p-12 text-center text-[#71717a] dark:text-[#a1a1aa] bg-white dark:bg-[#18181b] border border-[#e4e4e7] dark:border-[#27272a] rounded-2xl">
-            <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-[#71717a]" />
-            <p className="text-xs">Loading homelab registry...</p>
-          </div>
-        ) : viewMode === "table" ? (
-          <div className="space-y-4">
-            {/* Desktop Table with Custom Column Order & Sticky Actions */}
-            <div className="hidden lg:block">
-              <KeyTable
-                keys={keys}
-                visibility={visibility}
-                columnOrder={columnOrder}
-                onReorderColumns={handleReorderColumns}
-                revealedKeys={revealedKeys}
-                onToggleReveal={handleToggleReveal}
-                onCopyKey={handleCopyKey}
-                onEdit={(item) => {
-                  setEditingKey(item);
-                  setIsKeyModalOpen(true);
-                }}
-                onDelete={handleDeleteRequest}
-                onClone={handleClone}
-                onTouch={handleTouch}
-                onViewDetails={(item) => setDetailsKey(item)}
-                copiedId={copiedId}
-                selectedIds={selectedIds}
-                onToggleSelect={handleToggleSelect}
-                onSelectAll={handleSelectAll}
-                sortBy={sortBy}
-                sortOrder={sortOrder}
-                onSortChange={handleSortChange}
-              />
-            </div>
-            {/* Mobile / Tablet Responsive Fallback */}
-            <div className="lg:hidden">
-              <KeyCards
-                keys={keys}
-                visibility={visibility}
-                revealedKeys={revealedKeys}
-                onToggleReveal={handleToggleReveal}
-                onCopyKey={handleCopyKey}
-                onEdit={(item) => {
-                  setEditingKey(item);
-                  setIsKeyModalOpen(true);
-                }}
-                onDelete={handleDeleteRequest}
-                onClone={handleClone}
-                onTouch={handleTouch}
-                onViewDetails={(item) => setDetailsKey(item)}
-                copiedId={copiedId}
-                selectedIds={selectedIds}
-                onToggleSelect={handleToggleSelect}
-              />
-            </div>
-          </div>
-        ) : (
-          <KeyCards
-            keys={keys}
-            visibility={visibility}
-            revealedKeys={revealedKeys}
-            onToggleReveal={handleToggleReveal}
-            onCopyKey={handleCopyKey}
-            onEdit={(item) => {
-              setEditingKey(item);
-              setIsKeyModalOpen(true);
-            }}
-            onDelete={handleDeleteRequest}
-            onClone={handleClone}
-            onTouch={handleTouch}
-            onViewDetails={(item) => setDetailsKey(item)}
-            copiedId={copiedId}
-            selectedIds={selectedIds}
-            onToggleSelect={handleToggleSelect}
-          />
-        )}
+        {renderMainView()}
       </main>
 
       {/* Modals & Drawers */}

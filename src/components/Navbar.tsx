@@ -15,7 +15,6 @@ import {
   ArrowUpDown,
   FileJson,
   FileSpreadsheet,
-  Check,
 } from "lucide-react";
 import { KeylingLogo } from "./KeylingLogo";
 import { SettingsTab } from "./SettingsModal";

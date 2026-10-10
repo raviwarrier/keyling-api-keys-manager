@@ -24,44 +24,53 @@ const CHARSET_HEX_UPPER = "0123456789ABCDEF";
 const CHARSET_SYMBOLS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+[]{}|";
 const CHARSET_URL_SAFE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
-/**
- * Generate a cryptographically secure random secret string using window.crypto
- */
-export function generateSecret(options: SecretGeneratorOptions): string {
-  const { length, format, prefix, includeHyphens } = options;
+const CHARSET_MAP: Record<SecretFormat, string> = {
+  alphanumeric: CHARSET_ALPHA_NUMERIC,
+  hex: CHARSET_HEX_LOWER,
+  "hex-upper": CHARSET_HEX_UPPER,
+  "alphanumeric-symbols": CHARSET_SYMBOLS,
+  "url-safe": CHARSET_URL_SAFE,
+  uuid: CHARSET_HEX_LOWER,
+  "homelab-prefixed": CHARSET_ALPHA_NUMERIC,
+};
 
-  if (format === "uuid") {
-    if (typeof crypto.randomUUID === "function") {
-      return crypto.randomUUID();
-    }
-    // Fallback manual UUID v4
-    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-      const r = (crypto.getRandomValues(new Uint8Array(1))[0] % 16) | 0;
-      const v = c === "x" ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
+const POOL_SIZE_MAP: Record<SecretFormat, number> = {
+  alphanumeric: 62,
+  hex: 16,
+  "hex-upper": 16,
+  "alphanumeric-symbols": 82,
+  "url-safe": 64,
+  uuid: 16,
+  "homelab-prefixed": 62,
+};
+
+function generateUuid(): string {
+  if (typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
   }
+  // Fallback manual UUID v4
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = Math.trunc(crypto.getRandomValues(new Uint8Array(1))[0] % 16);
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
-  let charset = CHARSET_ALPHA_NUMERIC;
-  if (format === "hex") charset = CHARSET_HEX_LOWER;
-  else if (format === "hex-upper") charset = CHARSET_HEX_UPPER;
-  else if (format === "alphanumeric-symbols") charset = CHARSET_SYMBOLS;
-  else if (format === "url-safe") charset = CHARSET_URL_SAFE;
-  else if (format === "homelab-prefixed") charset = CHARSET_ALPHA_NUMERIC;
+function getPrefix(format: SecretFormat, prefix?: string): string {
+  if (prefix !== undefined && prefix !== "") {
+    return prefix;
+  }
+  return format === "homelab-prefixed" ? "hl_live_" : "";
+}
 
-  // Calculate required character count (accounting for prefix if any)
-  const actualPrefix = format === "homelab-prefixed" ? (prefix || "hl_live_") : (prefix || "");
-  const targetLen = Math.max(8, length - actualPrefix.length);
-
+function getRandomChars(charset: string, targetLen: number): string {
   const charsetLen = charset.length;
-  // Use crypto.getRandomValues with rejection sampling to avoid modulo bias
+  const maxValidByte = 256 - (256 % charsetLen);
   const randomBytes = new Uint8Array(targetLen * 2);
   crypto.getRandomValues(randomBytes);
 
   let result = "";
   let byteIndex = 0;
-
-  const maxValidByte = 256 - (256 % charsetLen);
 
   while (result.length < targetLen) {
     if (byteIndex >= randomBytes.length) {
@@ -73,15 +82,38 @@ export function generateSecret(options: SecretGeneratorOptions): string {
       result += charset[byte % charsetLen];
     }
   }
+  return result;
+}
 
-  if (includeHyphens && result.length >= 16) {
-    // Chunk every 4 or 8 characters
-    const chunkSize = result.length % 8 === 0 ? 8 : 6;
-    const chunks: string[] = [];
-    for (let i = 0; i < result.length; i += chunkSize) {
-      chunks.push(result.slice(i, i + chunkSize));
-    }
-    result = chunks.join("-");
+function insertHyphens(str: string): string {
+  if (str.length < 16) {
+    return str;
+  }
+  const chunkSize = str.length % 8 === 0 ? 8 : 6;
+  const chunks: string[] = [];
+  for (let i = 0; i < str.length; i += chunkSize) {
+    chunks.push(str.slice(i, i + chunkSize));
+  }
+  return chunks.join("-");
+}
+
+/**
+ * Generate a cryptographically secure random secret string using window.crypto
+ */
+export function generateSecret(options: SecretGeneratorOptions): string {
+  const { length, format, prefix, includeHyphens } = options;
+
+  if (format === "uuid") {
+    return generateUuid();
+  }
+
+  const actualPrefix = getPrefix(format, prefix);
+  const targetLen = Math.max(8, length - actualPrefix.length);
+  const charset = CHARSET_MAP[format] || CHARSET_ALPHA_NUMERIC;
+  let result = getRandomChars(charset, targetLen);
+
+  if (includeHyphens) {
+    result = insertHyphens(result);
   }
 
   return actualPrefix + result;
@@ -95,13 +127,8 @@ export function calculateEntropy(secret: string, format: SecretFormat): {
   strength: "Weak" | "Moderate" | "Strong" | "Very Strong";
   crackTimeEstimate: string;
 } {
-  let poolSize = 62;
-  if (format === "hex" || format === "hex-upper") poolSize = 16;
-  else if (format === "alphanumeric-symbols") poolSize = 82;
-  else if (format === "url-safe") poolSize = 64;
-  else if (format === "uuid") poolSize = 16;
-
-  const cleanLength = secret.replace(/[^a-zA-Z0-9!@#$%^&*()-_=+[\]{}|]/g, "").length;
+  const poolSize = POOL_SIZE_MAP[format] || 62;
+  const cleanLength = secret.replace(/[^a-zA-Z0-9!@#$%^&*()_=+[\\]{}|-]/g, "").length;
   const bits = Math.round(cleanLength * Math.log2(poolSize));
 
   let strength: "Weak" | "Moderate" | "Strong" | "Very Strong" = "Weak";

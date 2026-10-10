@@ -1,10 +1,11 @@
 import express from "express";
-import path from "path";
-import fs from "fs";
+import http from "node:http";
+import path from "node:path";
+import fs from "node:fs";
 import { createServer as createViteServer } from "vite";
 import initSqlJs, { Database } from "sql.js";
 
-const PORT: number = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const PORT: number = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 3000;
 const HOST: string = process.env.HOST || "127.0.0.1";
 const DATA_DIR = path.join(process.cwd(), "data");
 const DB_FILE = path.join(DATA_DIR, "homelab_keys.sqlite");
@@ -67,16 +68,16 @@ async function initDatabase() {
   // Migrate existing databases to add missing columns
   try {
     const tableInfo = queryAll<any>("PRAGMA table_info(api_keys);");
-    const columnNames = tableInfo.map((c: any) => c.name);
-    if (!columnNames.includes("provider")) {
+    const columnNames = new Set(tableInfo.map((c: any) => c.name));
+    if (!columnNames.has("provider")) {
       db.run("ALTER TABLE api_keys ADD COLUMN provider TEXT;");
       console.log("Migrated SQLite schema: added provider column.");
     }
-    if (!columnNames.includes("org_id")) {
+    if (!columnNames.has("org_id")) {
       db.run("ALTER TABLE api_keys ADD COLUMN org_id TEXT;");
       console.log("Migrated SQLite schema: added org_id column.");
     }
-    if (!columnNames.includes("client_id")) {
+    if (!columnNames.has("client_id")) {
       db.run("ALTER TABLE api_keys ADD COLUMN client_id TEXT;");
       console.log("Migrated SQLite schema: added client_id column.");
     }
@@ -110,6 +111,7 @@ async function startServer() {
   await initDatabase();
 
   const app = express();
+  app.disable("x-powered-by");
   app.use(express.json({ limit: "20mb" }));
 
   // API Routes
@@ -158,54 +160,63 @@ async function startServer() {
     }
   });
 
+function calculateKeyStats(keys: any[]) {
+  const now = new Date();
+  const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+  let active = 0;
+  let expiringSoon = 0;
+  let revokedOrExpired = 0;
+  let paused = 0;
+  const byEnvironment: Record<string, number> = {};
+
+  for (const k of keys) {
+    const env = k.environment || "Unassigned";
+    byEnvironment[env] = (byEnvironment[env] || 0) + 1;
+
+    if (k.status === "Revoked") {
+      revokedOrExpired++;
+      continue;
+    }
+
+    if (k.status === "Paused") {
+      paused++;
+      continue;
+    }
+
+    // Active or other
+    if (k.expiry_date) {
+      const exp = new Date(k.expiry_date);
+      if (!Number.isNaN(exp.getTime())) {
+        if (exp < now) {
+          revokedOrExpired++;
+          continue;
+        }
+        if (exp <= sevenDaysFromNow) {
+          expiringSoon++;
+          active++;
+          continue;
+        }
+      }
+    }
+    active++;
+  }
+
+  return {
+    total: keys.length,
+    active,
+    expiringSoon,
+    revokedOrExpired,
+    paused,
+    byEnvironment
+  };
+}
+
   // Stats calculation
   app.get("/api/stats", (req, res) => {
     try {
       const keys = queryAll<any>("SELECT * FROM api_keys;");
-      const now = new Date();
-      const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-      let active = 0;
-      let expiringSoon = 0;
-      let revokedOrExpired = 0;
-      let paused = 0;
-      const byEnvironment: Record<string, number> = {};
-
-      for (const k of keys) {
-        const env = k.environment || "Unassigned";
-        byEnvironment[env] = (byEnvironment[env] || 0) + 1;
-
-        if (k.status === "Revoked") {
-          revokedOrExpired++;
-        } else if (k.status === "Paused") {
-          paused++;
-        } else {
-          // Active or other
-          if (k.expiry_date) {
-            const exp = new Date(k.expiry_date);
-            if (!isNaN(exp.getTime())) {
-              if (exp < now) {
-                revokedOrExpired++;
-                continue;
-              } else if (exp <= sevenDaysFromNow) {
-                expiringSoon++;
-                active++;
-                continue;
-              }
-            }
-          }
-          active++;
-        }
-      }
-
-      res.json({
-        total: keys.length,
-        active,
-        expiringSoon,
-        revokedOrExpired,
-        paused,
-        byEnvironment
-      });
+      res.json(calculateKeyStats(keys));
     } catch (err: any) {
       res.status(500).json({ error: err.message || "Failed to fetch statistics" });
     }
@@ -246,10 +257,10 @@ async function startServer() {
         purpose
       } = req.body;
 
-      if (!app_name || !app_name.trim()) {
+      if (!app_name?.trim()) {
         return res.status(400).json({ error: "App Name is required" });
       }
-      if (!key_value || !key_value.trim()) {
+      if (!key_value?.trim()) {
         return res.status(400).json({ error: "Key Value is required" });
       }
 
@@ -318,10 +329,10 @@ async function startServer() {
         purpose
       } = req.body;
 
-      if (!app_name || !app_name.trim()) {
+      if (!app_name?.trim()) {
         return res.status(400).json({ error: "App Name is required" });
       }
-      if (!key_value || !key_value.trim()) {
+      if (!key_value?.trim()) {
         return res.status(400).json({ error: "Key Value is required" });
       }
 
@@ -513,7 +524,7 @@ async function startServer() {
         const values = headers.map(h => {
           const val = k[h] === null || k[h] === undefined ? "" : String(k[h]);
           // Escape quotes and wrap in quotes
-          const escaped = val.replace(/"/g, '""');
+          const escaped = val.replaceAll('"', '""');
           return `"${escaped}"`;
         });
         csvRows.push(values.join(","));
@@ -589,10 +600,15 @@ async function startServer() {
     }
   });
 
+  const server = http.createServer(app);
+
   // Vite middleware for development / static serving for production
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: false,
+      },
       appType: "spa",
     });
     app.use(vite.middlewares);
@@ -604,12 +620,16 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, HOST, () => {
+  server.listen(PORT, HOST, () => {
     console.log(`Homelab API Key Manager server running at http://${HOST}:${PORT}`);
   });
 }
 
-startServer().catch(err => {
-  console.error("Failed to start server:", err);
-  process.exit(1);
-});
+void (async () => {
+  try {
+    await startServer();
+  } catch (err) {
+    console.error("Failed to start server:", err);
+    process.exit(1);
+  }
+})();

@@ -157,11 +157,14 @@ export const DisplaySettingsModal: React.FC<DisplaySettingsModalProps> = ({
                   {fieldsInCategory.map((field) => {
                     const isVisible = visibility[field.key];
                     return (
-                      <div
+                      <button
                         key={field.key}
+                        type="button"
+                        role="switch"
+                        aria-checked={isVisible}
                         onClick={() => onToggleField(field.key)}
                         id={`toggle-field-wrapper-${field.key}`}
-                        className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between select-none ${
+                        className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between select-none text-left w-full ${
                           isVisible
                             ? "bg-white dark:bg-[#27272a] border-zinc-400 dark:border-zinc-600 shadow-xs"
                             : "bg-[#f4f4f5]/40 dark:bg-[#18181b]/60 border-[#e4e4e7] dark:border-[#27272a] opacity-60 hover:opacity-80"
@@ -180,27 +183,20 @@ export const DisplaySettingsModal: React.FC<DisplaySettingsModalProps> = ({
                         </div>
 
                         {/* Custom Toggle Switch */}
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={isVisible}
+                        <span
+                          aria-hidden="true"
                           id={`toggle-switch-${field.key}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onToggleField(field.key);
-                          }}
-                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                          className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out pointer-events-none ${
                             isVisible ? "bg-[#09090b] dark:bg-[#f4f4f5]" : "bg-zinc-300 dark:bg-zinc-700"
                           }`}
                         >
                           <span
-                            aria-hidden="true"
                             className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white dark:bg-[#09090b] shadow-sm ring-0 transition duration-200 ease-in-out ${
                               isVisible ? "translate-x-4" : "translate-x-0"
                             }`}
                           />
-                        </button>
-                      </div>
+                        </span>
+                      </button>
                     );
                   })}
                 </div>

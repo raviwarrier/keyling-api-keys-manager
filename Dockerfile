@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Copy package manifests and install dependencies
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --ignore-scripts
 
 # Copy source code and build
 COPY . .
@@ -20,13 +20,15 @@ ENV PORT=6644
 
 # Install production dependencies
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --ignore-scripts
 
 # Copy compiled backend and frontend from builder
 COPY --from=builder /app/dist ./dist
 
-# Create persistent storage directory
-RUN mkdir -p /app/data
+# Create persistent storage directory and set non-root ownership
+RUN mkdir -p /app/data && chown -R node:node /app
+
+USER node
 
 EXPOSE 6644
 

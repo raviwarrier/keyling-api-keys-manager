@@ -1,5 +1,5 @@
 import React from "react";
-import { Server, ShieldAlert, Laptop, Cpu, Globe, Boxes, Tag } from "lucide-react";
+import { Server, ShieldAlert, Laptop, Cpu, Globe, Boxes } from "lucide-react";
 
 interface EnvironmentBadgeProps {
   environment?: string | null;
@@ -18,8 +18,7 @@ const CUSTOM_PALETTES = [
 function getHashIndex(str: string, max: number): number {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
-    hash = (hash << 5) - hash + str.charCodeAt(i);
-    hash |= 0;
+    hash = Math.trunc((hash << 5) - hash + (str.codePointAt(i) ?? 0));
   }
   return Math.abs(hash) % max;
 }
@@ -33,7 +32,7 @@ export const EnvironmentBadge: React.FC<EnvironmentBadgeProps> = ({ environment,
   const lower = env.toLowerCase();
 
   let styles = "";
-  let Icon = Tag;
+  let Icon: React.ComponentType<{ className?: string }>;
 
   if (lower.includes("homelab") || lower.includes("home") || lower.includes("lab")) {
     styles = "bg-[#f2f4ec] text-[#4d5238] border-[#d5dcc6] dark:bg-[#23261e] dark:text-[#8d9178] dark:border-[#393d2e]";

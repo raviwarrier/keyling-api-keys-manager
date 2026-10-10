@@ -1,23 +1,127 @@
 import React, { useState, useEffect } from "react";
-import { ApiKeyItem, FieldVisibilitySettings, OptionalFieldKey } from "../types";
+import { ApiKeyItem, FieldVisibilitySettings } from "../types";
 import { FIELD_CONFIGS } from "../constants/fieldConfig";
-import { generateRandomKey } from "../utils/formatters";
 import { generateSecret } from "../utils/secretGenerator";
 import {
   KeyRound,
   Eye,
   EyeOff,
-  Wand2,
-  Calendar,
-  Layers,
-  Shield,
-  Clock,
   Sparkles,
   X,
   Plus,
   Save,
   SlidersHorizontal,
 } from "lucide-react";
+
+interface KeyModalHeaderProps {
+  initialKey?: ApiKeyItem | null;
+  onClose: () => void;
+}
+
+const KeyModalHeader: React.FC<KeyModalHeaderProps> = ({ initialKey, onClose }) => {
+  const title = initialKey ? "Edit API Key" : "Register New API Key";
+  const subtitle = initialKey
+    ? `Updating token for ${initialKey.app_name}`
+    : "Store and manage an API key in your SQLite homelab registry";
+
+  return (
+    <div className="px-6 py-4 border-b border-[#e4e4e7] dark:border-[#27272a] flex items-center justify-between bg-[#f4f4f5] dark:bg-[#27272a]/60">
+      <div className="flex items-center gap-3">
+        <div className="p-2 rounded-xl bg-zinc-200 dark:bg-zinc-800 text-[#09090b] dark:text-[#f4f4f5] border border-[#e4e4e7] dark:border-[#3f3f46]">
+          <KeyRound className="w-5 h-5" />
+        </div>
+        <div>
+          <h2 className="text-base font-semibold text-[#09090b] dark:text-[#f4f4f5]">{title}</h2>
+          <p className="text-xs text-[#71717a] dark:text-[#a1a1aa]">{subtitle}</p>
+        </div>
+      </div>
+      <button
+        id="close-key-modal-btn"
+        onClick={onClose}
+        className="p-1.5 text-[#71717a] hover:text-[#09090b] dark:text-[#a1a1aa] dark:hover:text-[#f4f4f5] rounded-lg hover:bg-[#e4e4e7] dark:hover:bg-[#27272a] transition-colors cursor-pointer"
+      >
+        <X className="w-5 h-5" />
+      </button>
+    </div>
+  );
+};
+
+interface KeyModalFooterProps {
+  loading: boolean;
+  isEditing: boolean;
+  onClose: () => void;
+  onSubmit: (e: React.FormEvent) => void;
+}
+
+const KeyModalFooter: React.FC<KeyModalFooterProps> = ({ loading, isEditing, onClose, onSubmit }) => {
+  const renderSubmitLabel = () => {
+    if (loading) {
+      return <span>Saving...</span>;
+    }
+    if (isEditing) {
+      return (
+        <>
+          <Save className="w-3.5 h-3.5" />
+          Update Key
+        </>
+      );
+    }
+    return (
+      <>
+        <Plus className="w-3.5 h-3.5" />
+        Register Key
+      </>
+    );
+  };
+
+  return (
+    <div className="px-6 py-4 border-t border-[#e4e4e7] dark:border-[#27272a] bg-[#f4f4f5] dark:bg-[#18181b] flex items-center justify-end gap-2.5">
+      <button
+        type="button"
+        id="cancel-key-modal-btn"
+        onClick={onClose}
+        className="px-4 py-2 rounded-xl text-xs font-medium text-[#52525b] dark:text-[#a1a1aa] hover:bg-[#e4e4e7] dark:hover:bg-[#27272a] transition-colors cursor-pointer"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        id="submit-key-modal-btn"
+        disabled={loading}
+        onClick={onSubmit}
+        className="px-5 py-2 rounded-xl bg-[#09090b] hover:bg-zinc-800 text-white dark:bg-[#f4f4f5] dark:text-[#09090b] dark:hover:bg-zinc-200 text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+      >
+        {renderSubmitLabel()}
+      </button>
+    </div>
+  );
+};
+
+interface HiddenFieldsNoticeProps {
+  count: number;
+  onOpenSettings: () => void;
+}
+
+const HiddenFieldsNotice: React.FC<HiddenFieldsNoticeProps> = ({ count, onOpenSettings }) => {
+  if (count <= 0) return null;
+  const suffix = count > 1 ? "s are" : " is";
+
+  return (
+    <div className="p-3 rounded-xl bg-[#f4f4f5]/70 dark:bg-[#27272a]/70 border border-[#e4e4e7] dark:border-[#27272a] flex items-center justify-between text-xs text-[#71717a] dark:text-[#a1a1aa]">
+      <span>
+        {count} optional field{suffix} hidden by Display Settings.
+      </span>
+      <button
+        type="button"
+        onClick={onOpenSettings}
+        className="text-[#09090b] dark:text-[#f4f4f5] font-medium hover:underline flex items-center gap-1 cursor-pointer"
+      >
+        <SlidersHorizontal className="w-3 h-3" />
+        Customize
+      </button>
+    </div>
+  );
+};
 
 interface KeyModalProps {
   isOpen: boolean;
@@ -117,12 +221,6 @@ export const KeyModal: React.FC<KeyModalProps> = ({
     setFormData((prev) => ({ ...prev, [field]: val }));
   };
 
-  const handleGenerate = (type: "homelab_sk" | "bearer64" | "hex32" | "uuid") => {
-    const key = generateRandomKey(type);
-    setFormData((prev) => ({ ...prev, key_value: key }));
-    setShowSecret(true);
-  };
-
   const setExpiryDays = (days: number) => {
     const d = new Date();
     d.setDate(d.getDate() + days);
@@ -160,31 +258,7 @@ export const KeyModal: React.FC<KeyModalProps> = ({
         id="key-modal"
         className="bg-white dark:bg-[#18181b] border border-[#e4e4e7] dark:border-[#27272a] rounded-2xl w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden"
       >
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-[#e4e4e7] dark:border-[#27272a] flex items-center justify-between bg-[#f4f4f5] dark:bg-[#27272a]/60">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-zinc-200 dark:bg-zinc-800 text-[#09090b] dark:text-[#f4f4f5] border border-[#e4e4e7] dark:border-[#3f3f46]">
-              <KeyRound className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-semibold text-[#09090b] dark:text-[#f4f4f5]">
-                {initialKey ? "Edit API Key" : "Register New API Key"}
-              </h2>
-              <p className="text-xs text-[#71717a] dark:text-[#a1a1aa]">
-                {initialKey
-                  ? `Updating token for ${initialKey.app_name}`
-                  : "Store and manage an API key in your SQLite homelab registry"}
-              </p>
-            </div>
-          </div>
-          <button
-            id="close-key-modal-btn"
-            onClick={onClose}
-            className="p-1.5 text-[#71717a] hover:text-[#09090b] dark:text-[#a1a1aa] dark:hover:text-[#f4f4f5] rounded-lg hover:bg-[#e4e4e7] dark:hover:bg-[#27272a] transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+        <KeyModalHeader initialKey={initialKey} onClose={onClose} />
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
@@ -197,7 +271,7 @@ export const KeyModal: React.FC<KeyModalProps> = ({
           {/* REQUIRED FIELDS (Always visible) */}
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
+              <label htmlFor="input-app-name" className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
                 App / Service Name <span className="text-red-500">*</span>
               </label>
               <input
@@ -212,7 +286,7 @@ export const KeyModal: React.FC<KeyModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
+              <label htmlFor="input-key-value" className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
                 Key Value / Token <span className="text-red-500">*</span>
               </label>
               <div className="relative">
@@ -310,7 +384,7 @@ export const KeyModal: React.FC<KeyModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-[#e4e4e7] dark:border-[#27272a]">
             {visibility.provider && (
               <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
+                <label htmlFor="input-provider" className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
                   API Provider
                 </label>
                 <input
@@ -327,7 +401,7 @@ export const KeyModal: React.FC<KeyModalProps> = ({
             {visibility.org_id && (
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa]">
+                  <label htmlFor="input-org-id" className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa]">
                     Organization ID (Org ID)
                   </label>
                   <button
@@ -355,7 +429,7 @@ export const KeyModal: React.FC<KeyModalProps> = ({
             {visibility.client_id && (
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa]">
+                  <label htmlFor="input-client-id" className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa]">
                     Client ID (App ID)
                   </label>
                   <button
@@ -382,7 +456,7 @@ export const KeyModal: React.FC<KeyModalProps> = ({
 
             {visibility.environment && (
               <div>
-                <label className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
+                <label htmlFor="input-environment" className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
                   Environment
                 </label>
                 <select
@@ -402,7 +476,7 @@ export const KeyModal: React.FC<KeyModalProps> = ({
 
             {visibility.status && (
               <div>
-                <label className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
+                <label htmlFor="input-status" className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
                   Status
                 </label>
                 <select
@@ -421,7 +495,7 @@ export const KeyModal: React.FC<KeyModalProps> = ({
             {visibility.expiry_date && (
               <div className="sm:col-span-2">
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa]">
+                  <label htmlFor="input-expiry-date" className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa]">
                     Expiry Date
                   </label>
                   <div className="flex items-center gap-1">
@@ -468,7 +542,7 @@ export const KeyModal: React.FC<KeyModalProps> = ({
 
             {visibility.project && (
               <div>
-                <label className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
+                <label htmlFor="input-project" className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
                   App / Service / Project
                 </label>
                 <input
@@ -484,7 +558,7 @@ export const KeyModal: React.FC<KeyModalProps> = ({
 
             {visibility.account && (
               <div>
-                <label className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
+                <label htmlFor="input-account" className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
                   Account / Linked Identity
                 </label>
                 <input
@@ -500,7 +574,7 @@ export const KeyModal: React.FC<KeyModalProps> = ({
 
             {visibility.created_date && (
               <div>
-                <label className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
+                <label htmlFor="input-created-date" className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
                   Created Date
                 </label>
                 <input
@@ -515,7 +589,7 @@ export const KeyModal: React.FC<KeyModalProps> = ({
 
             {visibility.last_used_date && (
               <div>
-                <label className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
+                <label htmlFor="input-last-used-date" className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
                   Last Used Date
                 </label>
                 <input
@@ -530,7 +604,7 @@ export const KeyModal: React.FC<KeyModalProps> = ({
 
             {visibility.ip_restrictions && (
               <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
+                <label htmlFor="input-ip-restrictions" className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
                   IP Restrictions / Allowed CIDR
                 </label>
                 <input
@@ -546,7 +620,7 @@ export const KeyModal: React.FC<KeyModalProps> = ({
 
             {visibility.portal_url && (
               <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
+                <label htmlFor="input-portal-url" className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
                   Portal URL / Dashboard Link
                 </label>
                 <input
@@ -562,7 +636,7 @@ export const KeyModal: React.FC<KeyModalProps> = ({
 
             {visibility.creator_contact && (
               <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
+                <label htmlFor="input-creator-contact" className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
                   Creator / Contact Info
                 </label>
                 <input
@@ -578,7 +652,7 @@ export const KeyModal: React.FC<KeyModalProps> = ({
 
             {visibility.purpose && (
               <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
+                <label htmlFor="input-purpose" className="block text-xs font-semibold text-[#52525b] dark:text-[#a1a1aa] mb-1.5">
                   Purpose & Integration Notes
                 </label>
                 <textarea
@@ -593,58 +667,16 @@ export const KeyModal: React.FC<KeyModalProps> = ({
             )}
           </div>
 
-          {/* Hidden fields notice */}
-          {hiddenOptionalCount > 0 && (
-            <div className="p-3 rounded-xl bg-[#f4f4f5]/70 dark:bg-[#27272a]/70 border border-[#e4e4e7] dark:border-[#27272a] flex items-center justify-between text-xs text-[#71717a] dark:text-[#a1a1aa]">
-              <span>
-                {hiddenOptionalCount} optional field{hiddenOptionalCount > 1 ? "s are" : " is"} hidden by Display Settings.
-              </span>
-              <button
-                type="button"
-                onClick={onOpenSettings}
-                className="text-[#09090b] dark:text-[#f4f4f5] font-medium hover:underline flex items-center gap-1 cursor-pointer"
-              >
-                <SlidersHorizontal className="w-3 h-3" />
-                Customize
-              </button>
-            </div>
-          )}
+          <HiddenFieldsNotice count={hiddenOptionalCount} onOpenSettings={onOpenSettings} />
         </form>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-[#e4e4e7] dark:border-[#27272a] bg-[#f4f4f5] dark:bg-[#18181b] flex items-center justify-end gap-2.5">
-          <button
-            type="button"
-            id="cancel-key-modal-btn"
-            onClick={onClose}
-            className="px-4 py-2 rounded-xl text-xs font-medium text-[#52525b] dark:text-[#a1a1aa] hover:bg-[#e4e4e7] dark:hover:bg-[#27272a] transition-colors cursor-pointer"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            id="submit-key-modal-btn"
-            disabled={loading}
-            onClick={handleSubmit}
-            className="px-5 py-2 rounded-xl bg-[#09090b] hover:bg-zinc-800 text-white dark:bg-[#f4f4f5] dark:text-[#09090b] dark:hover:bg-zinc-200 text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-          >
-            {loading ? (
-              <span>Saving...</span>
-            ) : initialKey ? (
-              <>
-                <Save className="w-3.5 h-3.5" />
-                Update Key
-              </>
-            ) : (
-              <>
-                <Plus className="w-3.5 h-3.5" />
-                Register Key
-              </>
-            )}
-          </button>
-        </div>
+        <KeyModalFooter
+          loading={loading}
+          isEditing={Boolean(initialKey)}
+          onClose={onClose}
+          onSubmit={handleSubmit}
+        />
       </div>
     </div>
   );
 };
-

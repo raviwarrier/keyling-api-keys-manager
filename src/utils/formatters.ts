@@ -1,4 +1,5 @@
 import { ApiKeyItem } from "../types";
+import { generateSecret } from "./secretGenerator";
 
 export function maskKey(key: string, visible: boolean = false): string {
   if (!key) return "";
@@ -9,12 +10,15 @@ export function maskKey(key: string, visible: boolean = false): string {
   }
 
   // Check for common prefix patterns separated by underscore, hyphen, or colon
-  const prefixMatch = key.match(/^([a-zA-Z0-9_\-]+[_\-:])(.+)$/);
-  if (prefixMatch && prefixMatch[1].length <= 16 && prefixMatch[2].length > 6) {
-    const prefix = prefixMatch[1];
-    const rest = prefixMatch[2];
-    const last4 = rest.slice(-4);
-    return `${prefix}••••••••${last4}`;
+  const prefixRegex = /^([a-zA-Z0-9_]+[-_:])/;
+  const match = prefixRegex.exec(key);
+  if (match) {
+    const prefix = match[1];
+    const rest = key.slice(prefix.length);
+    if (prefix.length <= 16 && rest.length > 6) {
+      const last4 = rest.slice(-4);
+      return `${prefix}••••••••${last4}`;
+    }
   }
 
   const first4 = key.slice(0, 4);
@@ -51,7 +55,7 @@ export function evaluateKeyStatus(key: ApiKeyItem): KeyStatusEvaluation {
   // Check expiration if date exists
   if (key.expiry_date) {
     const expDate = new Date(key.expiry_date);
-    if (!isNaN(expDate.getTime())) {
+    if (!Number.isNaN(expDate.getTime())) {
       const now = new Date();
       const diffMs = expDate.getTime() - now.getTime();
       const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
@@ -94,7 +98,7 @@ export function formatDate(dateString?: string | null): string {
   if (!dateString) return "—";
   try {
     const d = new Date(dateString);
-    if (isNaN(d.getTime())) return dateString;
+    if (Number.isNaN(d.getTime())) return dateString;
     return d.toLocaleDateString(undefined, {
       year: "numeric",
       month: "short",
@@ -109,7 +113,7 @@ export function formatDateTime(dateString?: string | null): string {
   if (!dateString) return "—";
   try {
     const d = new Date(dateString);
-    if (isNaN(d.getTime())) return dateString;
+    if (Number.isNaN(d.getTime())) return dateString;
     return `${d.toLocaleDateString(undefined, {
       year: "numeric",
       month: "short",
@@ -124,7 +128,7 @@ export function formatRelativeTime(dateString?: string | null): string {
   if (!dateString) return "Never";
   try {
     const d = new Date(dateString);
-    if (isNaN(d.getTime())) return dateString;
+    if (Number.isNaN(d.getTime())) return dateString;
     const now = new Date();
     const diffSec = Math.floor((now.getTime() - d.getTime()) / 1000);
 
@@ -145,36 +149,17 @@ export function formatRelativeTime(dateString?: string | null): string {
 
 export function generateRandomKey(type: "hex32" | "bearer64" | "homelab_sk" | "uuid"): string {
   if (type === "uuid") {
-    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      const v = c === "x" ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
+    return generateSecret({ length: 36, format: "uuid" });
   }
 
   if (type === "homelab_sk") {
-    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    let token = "hl_sec_";
-    for (let i = 0; i < 32; i++) {
-      token += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return token;
+    return generateSecret({ length: 39, format: "homelab-prefixed", prefix: "hl_sec_" });
   }
 
   if (type === "bearer64") {
-    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_";
-    let token = "sk-live-";
-    for (let i = 0; i < 40; i++) {
-      token += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return token;
+    return generateSecret({ length: 48, format: "url-safe", prefix: "sk-live-" });
   }
 
   // hex32
-  const chars = "0123456789abcdef";
-  let token = "";
-  for (let i = 0; i < 32; i++) {
-    token += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return token;
+  return generateSecret({ length: 32, format: "hex" });
 }
