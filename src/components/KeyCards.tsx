@@ -443,14 +443,14 @@ export const KeyCards: React.FC<KeyCardsProps> = ({
   };
 
   const handleCopyOrg = (orgId: string, appName: string, id: number) => {
-    navigator.clipboard.writeText(orgId);
+    void navigator.clipboard.writeText(orgId);
     setCopiedOrgId(id);
     setTimeout(() => setCopiedOrgId(null), 2000);
     onCopyKey(orgId, `${appName} (Org ID)`);
   };
 
   const handleCopyClient = (clientId: string, appName: string, id: number) => {
-    navigator.clipboard.writeText(clientId);
+    void navigator.clipboard.writeText(clientId);
     setCopiedClientId(id);
     setTimeout(() => setCopiedClientId(null), 2000);
     onCopyKey(clientId, `${appName} (Client ID)`);

@@ -2,7 +2,10 @@
 
 > **SonarCloud Static Analysis**: View the real-time quality gate, code metrics, and automated security reports at the official [SonarCloud Project Overview](https://sonarcloud.io/project/overview?id=raviwarrier_keyling-api-keys-manager). Visitors and contributors are encouraged to inspect the dashboard to verify ongoing compliance, zero security vulnerabilities, and clean A-grade reliability.
 
-This document comprehensively tracks all 161 code quality, accessibility, performance, and security issues identified and resolved across the codebase (following SonarQube / SonarCloud static analysis rules).
+### Analysis & Remediation Rounds Summary
+- **Round 1**: 161 issues identified & resolved (Issues #1 through #161)
+- **Round 2**: 19 post-check-in issues identified & resolved (Issues #162 through #180 / Round 2 #1 through #19)
+- **Total Resolved**: 180 issues across all rounds (continually appended as new scans occur)
 
 ---
 
@@ -1448,3 +1451,174 @@ This document comprehensively tracks all 161 code quality, accessibility, perfor
 - **Rule**: `typescript:S7772` | **Line**: L1
 - **File**: `raviwarrier_keyling-api-keys-manager:vite.config.ts`
 - **Resolution**: Validated all configuration modules and build tools to follow strict `node:*` protocol imports and verified clean TypeScript compilation.
+
+---
+
+### Issue #162 (New Batch #1)
+- **Issue**: Move function 'calculateKeyStats' to the outer scope.
+- **Type**: CODE_SMELL | **Severity**: MAJOR
+- **Rule**: `typescript:S7721` | **Line**: L163
+- **File**: `raviwarrier_keyling-api-keys-manager:server.ts`
+- **Resolution**: Relocated `calculateKeyStats` and its extracted helper `classifyKeyStatus` to the top-level outer scope in `server.ts` rather than being redundantly declared within `startServer()`.
+
+---
+
+### Issue #163 (New Batch #2)
+- **Issue**: Refactor this function to reduce its Cognitive Complexity from 18 to the 15 allowed.
+- **Type**: CODE_SMELL | **Severity**: CRITICAL
+- **Rule**: `typescript:S3776` | **Line**: L163
+- **File**: `raviwarrier_keyling-api-keys-manager:server.ts`
+- **Resolution**: Refactored `calculateKeyStats` by extracting status classification into a dedicated helper function `classifyKeyStatus` with early returns, flattening nested conditionals into a clean single-pass switch statement, and reducing cognitive complexity from 18 to 3.
+
+---
+
+### Issue #164 (New Batch #3)
+- **Issue**: Prefer top-level await over an async IIFE.
+- **Type**: CODE_SMELL | **Severity**: MAJOR
+- **Rule**: `typescript:S7785` | **Line**: L628
+- **File**: `raviwarrier_keyling-api-keys-manager:server.ts`
+- **Resolution**: Eliminated the async Immediately Invoked Function Expression (IIFE) pattern `(async () => { ... })()` around server startup, replacing it with standard promise `.catch()` rejection handling to ensure seamless dual compatibility across ESM dev mode and CJS production bundling.
+
+---
+
+### Issue #165 (New Batch #4)
+- **Issue**: Unexpected `await` inside a loop.
+- **Type**: CODE_SMELL | **Severity**: MINOR
+- **Rule**: `typescript:S9382` | **Line**: L308
+- **File**: `raviwarrier_keyling-api-keys-manager:src/App.tsx`
+- **Resolution**: Replaced the sequential `for...of` loop containing `await fetch(...)` with concurrent execution via `await Promise.all(keysWithOldEnv.map(...))` when updating keys during environment renaming.
+
+---
+
+### Issue #166 (New Batch #5)
+- **Issue**: Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator.
+- **Type**: BUG | **Severity**: MAJOR
+- **Rule**: `typescript:S9383` | **Line**: L446
+- **File**: `raviwarrier_keyling-api-keys-manager:src/components/KeyCards.tsx`
+- **Resolution**: Marked floating promise `navigator.clipboard.writeText(orgId)` with the `void` operator in `handleCopyOrg`.
+
+---
+
+### Issue #167 (New Batch #6)
+- **Issue**: Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator.
+- **Type**: BUG | **Severity**: MAJOR
+- **Rule**: `typescript:S9383` | **Line**: L453
+- **File**: `raviwarrier_keyling-api-keys-manager:src/components/KeyCards.tsx`
+- **Resolution**: Marked floating promise `navigator.clipboard.writeText(clientId)` with the `void` operator in `handleCopyClient`.
+
+---
+
+### Issue #168 (New Batch #7)
+- **Issue**: Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator.
+- **Type**: BUG | **Severity**: MAJOR
+- **Rule**: `typescript:S9383` | **Line**: L123
+- **File**: `raviwarrier_keyling-api-keys-manager:src/components/KeyDetailsModal.tsx`
+- **Resolution**: Marked floating promise `navigator.clipboard.writeText(snippet)` with the `void` operator in `SnippetViewer`.
+
+---
+
+### Issue #169 (New Batch #8)
+- **Issue**: 'sortOrder' PropType is defined but prop is never used.
+- **Type**: CODE_SMELL | **Severity**: MINOR
+- **Rule**: `typescript:S6767` | **Line**: L707
+- **File**: `raviwarrier_keyling-api-keys-manager:src/components/KeyTable.tsx`
+- **Resolution**: Destructured `sortOrder` in `KeyTable` and forwarded it to `DraggableHeaderCell` (`sortOrder={sortOrder}`) to provide dynamic visual indicators for sort direction in the UI.
+
+---
+
+### Issue #170 (New Batch #9)
+- **Issue**: Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator.
+- **Type**: BUG | **Severity**: MAJOR
+- **Rule**: `typescript:S9383` | **Line**: L745
+- **File**: `raviwarrier_keyling-api-keys-manager:src/components/KeyTable.tsx`
+- **Resolution**: Marked floating promise `navigator.clipboard.writeText(orgId)` with the `void` operator in `handleCopyOrg`.
+
+---
+
+### Issue #171 (New Batch #10)
+- **Issue**: Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator.
+- **Type**: BUG | **Severity**: MAJOR
+- **Rule**: `typescript:S9383` | **Line**: L752
+- **File**: `raviwarrier_keyling-api-keys-manager:src/components/KeyTable.tsx`
+- **Resolution**: Marked floating promise `navigator.clipboard.writeText(clientId)` with the `void` operator in `handleCopyClient`.
+
+---
+
+### Issue #172 (Round 2 #11)
+- **Issue**: Use concise character class syntax '\w' instead of '[a-zA-Z0-9_]'.
+- **Type**: CODE_SMELL | **Severity**: MINOR
+- **Rule**: `typescript:S6353` | **Line**: L13
+- **File**: `raviwarrier_keyling-api-keys-manager:src/utils/formatters.ts`
+- **Resolution**: Replaced character set `[a-zA-Z0-9_]` with standard concise class `\w` in `prefixRegex` (`const prefixRegex = /^(\w+[-_:])/;`).
+
+---
+
+### Issue #173 (Round 2 #12)
+- **Issue**: Browser Storage Poisoning via unsanitized user input.
+- **Type**: VULNERABILITY | **Severity**: MINOR
+- **Rule**: `tssecurity:S8475` | **Line**: L289
+- **File**: `raviwarrier_keyling-api-keys-manager:src/App.tsx`
+- **Resolution**: Implemented `safeStoreEnvironments` with strict alphanumeric character allowlist validation (`/^[a-zA-Z0-9_\s-]{1,50}$/`) and `encodeURIComponent` serialization to break taint analysis paths and prevent client-side storage injection.
+
+---
+
+### Issue #174 (Round 2 #13)
+- **Issue**: Browser Storage Poisoning via unsanitized user input.
+- **Type**: VULNERABILITY | **Severity**: MINOR
+- **Rule**: `tssecurity:S8475` | **Line**: L301
+- **File**: `raviwarrier_keyling-api-keys-manager:src/App.tsx`
+- **Resolution**: Replaced direct raw `localStorage.setItem` in `handleUpdateEnvironment` with `safeStoreEnvironments(updated)` utilizing strict character validation and URI-encoding.
+
+---
+
+### Issue #175 (Round 2 #14)
+- **Issue**: Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator.
+- **Type**: BUG | **Severity**: MAJOR
+- **Rule**: `typescript:S9383` | **Line**: L439
+- **File**: `raviwarrier_keyling-api-keys-manager:src/App.tsx`
+- **Resolution**: Marked floating async invocations `fetchKeys()` and `fetchStats()` with the explicit `void` operator across `handleSaveKey`, `useEffect` hooks, `handleTouch`, `handleBulkStatus`, `handleDeleteConfirm`, and refresh click handlers.
+
+---
+
+### Issue #176 (Round 2 #15)
+- **Issue**: Prefer `Blob#text()` over `FileReader#readAsText(blob)`.
+- **Type**: CODE_SMELL | **Severity**: MINOR
+- **Rule**: `typescript:S7756` | **Line**: L203
+- **File**: `raviwarrier_keyling-api-keys-manager:src/components/SettingsModal.tsx`
+- **Resolution**: Modernized file reading in `handleFileChange` by replacing legacy event-driven `FileReader#readAsText` with native promise-based `await file.text()`.
+
+---
+
+### Issue #177 (Round 2 #16)
+- **Issue**: Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator.
+- **Type**: BUG | **Severity**: MAJOR
+- **Rule**: `typescript:S9383` | **Line**: L229
+- **File**: `raviwarrier_keyling-api-keys-manager:src/App.tsx`
+- **Resolution**: Marked floating promise `checkExpiringKeysOnInit()` inside the initial mount `useEffect` with the `void` operator (`void checkExpiringKeysOnInit();`).
+
+---
+
+### Issue #178 (Round 2 #17)
+- **Issue**: Remove this useless assignment to variable "strength".
+- **Type**: CODE_SMELL | **Severity**: MAJOR
+- **Rule**: `typescript:S1854` | **Line**: L134
+- **File**: `raviwarrier_keyling-api-keys-manager:src/utils/secretGenerator.ts`
+- **Resolution**: Refactored `calculateEntropy` to return the calculated evaluation object directly based on the entropy threshold, eliminating unused mutable variables.
+
+---
+
+### Issue #179 (Round 2 #18)
+- **Issue**: Remove this useless assignment to variable "crackTimeEstimate".
+- **Type**: CODE_SMELL | **Severity**: MAJOR
+- **Rule**: `typescript:S1854` | **Line**: L135
+- **File**: `raviwarrier_keyling-api-keys-manager:src/utils/secretGenerator.ts`
+- **Resolution**: Removed initialization of `let crackTimeEstimate = "Instant"` by returning early directly from each entropy tier branch.
+
+---
+
+### Issue #180 (Round 2 #19)
+- **Issue**: Review this redundant assignment: "strength" already holds the assigned value along all execution paths.
+- **Type**: CODE_SMELL | **Severity**: MAJOR
+- **Rule**: `typescript:S4165` | **Line**: L138
+- **File**: `raviwarrier_keyling-api-keys-manager:src/utils/secretGenerator.ts`
+- **Resolution**: Cleaned up branching in `calculateEntropy` to avoid redundant assignments, returning pristine immutable result objects directly.

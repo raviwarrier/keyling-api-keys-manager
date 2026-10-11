@@ -42,17 +42,43 @@ const parseExpiryDate = (dateStr?: string | null): Date | null => {
   return Number.isNaN(d.getTime()) ? null : d;
 };
 
-// Safe sanitizers to prevent Browser Storage Poisoning (tssecurity:S8475)
+// Safe storage encoding and allowlist validation to prevent Browser Storage Poisoning (tssecurity:S8475)
 const sanitizeEnvironmentString = (val: unknown): string => {
   if (typeof val !== "string") return "";
-  return val.replace(/[^\w\s-]/g, "").trim().slice(0, 50);
+  const trimmed = val.trim();
+  if (!/^[a-zA-Z0-9_\s-]{1,50}$/.test(trimmed)) {
+    return "";
+  }
+  return encodeURIComponent(decodeURIComponent(trimmed)).slice(0, 50);
 };
 
-const sanitizeEnvironmentList = (items: unknown): string[] => {
-  if (!Array.isArray(items)) return [];
-  return items
-    .map((item) => sanitizeEnvironmentString(item))
-    .filter((item): item is string => item.length > 0);
+const safeStoreEnvironments = (items: string[]) => {
+  try {
+    const validated = items
+      .filter((item): item is string => typeof item === "string" && /^[a-zA-Z0-9_\s-]{1,50}$/.test(item.trim()))
+      .map((item) => encodeURIComponent(item.trim()));
+    localStorage.setItem("homelab_keys_custom_environments", JSON.stringify(validated));
+  } catch (e) {
+    console.warn("Failed to safely write custom environments to storage:", e);
+  }
+};
+
+const safeLoadEnvironments = (): string[] => {
+  try {
+    const saved = localStorage.getItem("homelab_keys_custom_environments");
+    if (saved) {
+      const parsed: unknown = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter((item): item is string => typeof item === "string")
+          .map((item) => decodeURIComponent(item))
+          .filter((item) => /^[a-zA-Z0-9_\s-]{1,50}$/.test(item));
+      }
+    }
+  } catch (e) {
+    console.warn("Failed to load custom environments from storage:", e);
+  }
+  return [];
 };
 
 export default function App() {
@@ -101,17 +127,9 @@ export default function App() {
 
   // Dynamic Environment Labels (Persisted in localStorage with sanitization)
   const [environments, setEnvironments] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem("homelab_keys_custom_environments");
-      if (saved) {
-        const parsed: unknown = JSON.parse(saved);
-        const validated = sanitizeEnvironmentList(parsed);
-        if (validated.length > 0) {
-          return validated;
-        }
-      }
-    } catch (e) {
-      console.warn("Failed to load environments from localStorage:", e);
+    const loaded = safeLoadEnvironments();
+    if (loaded.length > 0) {
+      return loaded;
     }
     return [...DEFAULT_ENVIRONMENTS];
   });
@@ -226,7 +244,7 @@ export default function App() {
       }
     };
 
-    checkExpiringKeysOnInit();
+    void checkExpiringKeysOnInit();
   }, []);
 
   // Sync theme class to <html>
@@ -276,18 +294,18 @@ export default function App() {
     addToast("info", "Column Order Reset", "Restored default table column arrangement.");
   };
 
-  // Environment operations (Sanitized to prevent Browser Storage Poisoning)
+  // Environment operations (Sanitized and encoded to prevent Browser Storage Poisoning per tssecurity:S8475)
   const handleAddEnvironment = (name: string) => {
     const cleanName = sanitizeEnvironmentString(name);
     if (!cleanName) return;
 
-    const currentClean = sanitizeEnvironmentList(environments);
-    if (currentClean.includes(cleanName)) return;
+    const decoded = decodeURIComponent(cleanName);
+    if (environments.includes(decoded)) return;
 
-    const updated = [...currentClean, cleanName];
+    const updated = [...environments, decoded];
     setEnvironments(updated);
-    localStorage.setItem("homelab_keys_custom_environments", JSON.stringify(updated));
-    addToast("success", "Environment Added", `Added environment label "${cleanName}"`);
+    safeStoreEnvironments(updated);
+    addToast("success", "Environment Added", `Added environment label "${decoded}"`);
   };
 
   const handleUpdateEnvironment = async (oldName: string, newName: string) => {
@@ -295,42 +313,45 @@ export default function App() {
     const cleanNew = sanitizeEnvironmentString(newName);
     if (!cleanOld || !cleanNew) return;
 
-    const currentClean = sanitizeEnvironmentList(environments);
-    const updated = currentClean.map((e) => (e === cleanOld ? cleanNew : e));
+    const decodedOld = decodeURIComponent(cleanOld);
+    const decodedNew = decodeURIComponent(cleanNew);
+
+    const updated = environments.map((e) => (e === decodedOld ? decodedNew : e));
     setEnvironments(updated);
-    localStorage.setItem("homelab_keys_custom_environments", JSON.stringify(updated));
+    safeStoreEnvironments(updated);
 
     // Also update any keys that were using the old environment name in SQLite
-    const keysWithOldEnv = keys.filter((k) => k.environment === cleanOld);
+    const keysWithOldEnv = keys.filter((k) => k.environment === decodedOld);
     if (keysWithOldEnv.length > 0) {
       try {
-        for (const k of keysWithOldEnv) {
-          await fetch(`/api/keys/${k.id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ environment: cleanNew }),
-          });
-        }
-        fetchKeys();
-        fetchStats();
+        await Promise.all(
+          keysWithOldEnv.map((k) =>
+            fetch(`/api/keys/${k.id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ environment: decodedNew }),
+            })
+          )
+        );
+        void fetchKeys();
+        void fetchStats();
       } catch (e) {
         console.error("Failed to migrate existing keys to renamed environment:", e);
       }
     }
 
-    if (environmentFilter === cleanOld) {
-      setEnvironmentFilter(cleanNew);
+    if (environmentFilter === decodedOld) {
+      setEnvironmentFilter(decodedNew);
     }
 
-    addToast("success", "Environment Renamed", `Renamed "${cleanOld}" to "${cleanNew}"`);
+    addToast("success", "Environment Renamed", `Renamed "${decodedOld}" to "${decodedNew}"`);
   };
 
   const handleDeleteEnvironment = (name: string) => {
-    const cleanTarget = sanitizeEnvironmentString(name);
-    const currentClean = sanitizeEnvironmentList(environments);
-    const updated = currentClean.filter((e) => e !== cleanTarget);
+    const cleanTarget = decodeURIComponent(sanitizeEnvironmentString(name));
+    const updated = environments.filter((e) => e !== cleanTarget);
     setEnvironments(updated);
-    localStorage.setItem("homelab_keys_custom_environments", JSON.stringify(updated));
+    safeStoreEnvironments(updated);
     if (environmentFilter === cleanTarget) {
       setEnvironmentFilter("All");
     }
@@ -340,7 +361,7 @@ export default function App() {
   const handleResetEnvironments = () => {
     const defaultList = [...DEFAULT_ENVIRONMENTS];
     setEnvironments(defaultList);
-    localStorage.setItem("homelab_keys_custom_environments", JSON.stringify(defaultList));
+    safeStoreEnvironments(defaultList);
     addToast("info", "Environments Reset", "Restored default environment labels list.");
   };
 
@@ -395,11 +416,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    fetchKeys();
+    void fetchKeys();
   }, [fetchKeys]);
 
   useEffect(() => {
-    fetchStats();
+    void fetchStats();
   }, [fetchStats]);
 
   // Key operations
@@ -427,8 +448,8 @@ export default function App() {
       }
       addToast("success", "Key Registered", `Successfully registered ${formData.app_name}`);
     }
-    fetchKeys();
-    fetchStats();
+    void fetchKeys();
+    void fetchStats();
   };
 
   const handleToggleReveal = (id: number) => {
@@ -436,7 +457,7 @@ export default function App() {
   };
 
   const handleCopyKey = (keyText: string, appName: string) => {
-    navigator.clipboard.writeText(keyText);
+    void navigator.clipboard.writeText(keyText);
     const item = keys.find((k) => k.key_value === keyText);
     if (item) {
       setCopiedId(item.id);
@@ -481,8 +502,8 @@ export default function App() {
       }
       setSelectedIds((prev) => prev.filter((id) => !deleteConfirm.ids.includes(id)));
       setDeleteConfirm((prev) => ({ ...prev, isOpen: false }));
-      fetchKeys();
-      fetchStats();
+      void fetchKeys();
+      void fetchStats();
     } catch (err: any) {
       console.error(err);
       addToast("error", "Delete Failed", err.message || "Could not delete key");
@@ -507,8 +528,8 @@ export default function App() {
       const res = await fetch(`/api/keys/${id}/touch`, { method: "POST" });
       if (!res.ok) throw new Error("Failed to update activity");
       addToast("success", "Activity Recorded", "Marked key as active right now.");
-      fetchKeys();
-      fetchStats();
+      void fetchKeys();
+      void fetchStats();
     } catch (err: any) {
       console.error(err);
       addToast("error", "Error", "Could not record key usage");
@@ -527,8 +548,8 @@ export default function App() {
       if (!res.ok) throw new Error("Failed to update status");
       addToast("success", "Status Updated", `Updated ${selectedIds.length} keys to ${status}`);
       setSelectedIds([]);
-      fetchKeys();
-      fetchStats();
+      void fetchKeys();
+      void fetchStats();
     } catch (err: any) {
       console.error(err);
       addToast("error", "Error", "Failed to update bulk status");
@@ -576,8 +597,8 @@ export default function App() {
       `Successfully imported ${data.importedCount} keys into SQLite database.`
     );
     setSelectedIds([]);
-    fetchKeys();
-    fetchStats();
+    void fetchKeys();
+    void fetchStats();
   };
 
   const openSettingsModal = (tab: SettingsTab = "display") => {
@@ -778,7 +799,9 @@ export default function App() {
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => fetchKeys()}
+              onClick={() => {
+                void fetchKeys();
+              }}
               className="p-1 rounded text-[#71717a] hover:text-[#09090b] dark:text-[#a1a1aa] dark:hover:text-[#f4f4f5] transition-colors flex items-center gap-1 cursor-pointer"
               title="Refresh table"
             >

@@ -10,7 +10,7 @@ export function maskKey(key: string, visible: boolean = false): string {
   }
 
   // Check for common prefix patterns separated by underscore, hyphen, or colon
-  const prefixRegex = /^([a-zA-Z0-9_]+[-_:])/;
+  const prefixRegex = /^(\w+[-_:])/;
   const match = prefixRegex.exec(key);
   if (match) {
     const prefix = match[1];

@@ -172,35 +172,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setEnvError(null);
   };
 
-  // Backup & Import
-  const handleFileChange = (file: File) => {
+  // Backup & Import (Prefer Blob#text() over FileReader per typescript:S7756)
+  const handleFileChange = async (file: File) => {
     setImportFile(file);
     setParseError(null);
     setSuccessMsg(null);
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const text = e.target?.result as string;
-        const data = JSON.parse(text);
-        const items = Array.isArray(data) ? data : data.items || data.keys;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      const items = Array.isArray(data) ? data : data.items || data.keys;
 
-        if (!Array.isArray(items)) {
-          throw new TypeError("JSON must contain an array of API key objects.");
-        }
-
-        const validItems = items.filter((k) => k.app_name && k.key_value);
-        if (validItems.length === 0) {
-          throw new TypeError("No valid keys with 'app_name' and 'key_value' found in the JSON file.");
-        }
-
-        setParsedItems(validItems);
-      } catch (err: any) {
-        setParseError(err.message || "Failed to parse JSON file.");
-        setParsedItems(null);
+      if (!Array.isArray(items)) {
+        throw new TypeError("JSON must contain an array of API key objects.");
       }
-    };
-    reader.readAsText(file);
+
+      const validItems = items.filter((k) => k.app_name && k.key_value);
+      if (validItems.length === 0) {
+        throw new TypeError("No valid keys with 'app_name' and 'key_value' found in the JSON file.");
+      }
+
+      setParsedItems(validItems);
+    } catch (err: any) {
+      setParseError(err.message || "Failed to parse JSON file.");
+      setParsedItems(null);
+    }
   };
 
   const handleImport = async () => {
@@ -761,7 +757,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   accept=".json"
                   onChange={(e) => {
                     if (e.target.files?.[0]) {
-                      handleFileChange(e.target.files[0]);
+                      void handleFileChange(e.target.files[0]);
                     }
                   }}
                   className="hidden"

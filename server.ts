@@ -102,6 +102,66 @@ function queryAll<T>(sql: string, params: any[] = []): T[] {
   return rows;
 }
 
+function classifyKeyStatus(
+  k: any,
+  now: Date,
+  sevenDaysFromNow: Date
+): "revoked" | "paused" | "expired" | "expiringSoon" | "active" {
+  if (k.status === "Revoked") return "revoked";
+  if (k.status === "Paused") return "paused";
+  if (!k.expiry_date) return "active";
+
+  const exp = new Date(k.expiry_date);
+  if (Number.isNaN(exp.getTime())) return "active";
+  if (exp < now) return "expired";
+  if (exp <= sevenDaysFromNow) return "expiringSoon";
+  return "active";
+}
+
+function calculateKeyStats(keys: any[]) {
+  const now = new Date();
+  const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+  let active = 0;
+  let expiringSoon = 0;
+  let revokedOrExpired = 0;
+  let paused = 0;
+  const byEnvironment: Record<string, number> = {};
+
+  for (const k of keys) {
+    const env = k.environment || "Unassigned";
+    byEnvironment[env] = (byEnvironment[env] || 0) + 1;
+
+    const classification = classifyKeyStatus(k, now, sevenDaysFromNow);
+    switch (classification) {
+      case "revoked":
+      case "expired":
+        revokedOrExpired++;
+        break;
+      case "paused":
+        paused++;
+        break;
+      case "expiringSoon":
+        expiringSoon++;
+        active++;
+        break;
+      case "active":
+      default:
+        active++;
+        break;
+    }
+  }
+
+  return {
+    total: keys.length,
+    active,
+    expiringSoon,
+    revokedOrExpired,
+    paused,
+    byEnvironment,
+  };
+}
+
 function queryOne<T>(sql: string, params: any[] = []): T | null {
   const rows = queryAll<T>(sql, params);
   return rows.length > 0 ? rows[0] : null;
@@ -159,58 +219,6 @@ async function startServer() {
       res.status(500).json({ error: err.message || "Failed to fetch keys" });
     }
   });
-
-function calculateKeyStats(keys: any[]) {
-  const now = new Date();
-  const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-  let active = 0;
-  let expiringSoon = 0;
-  let revokedOrExpired = 0;
-  let paused = 0;
-  const byEnvironment: Record<string, number> = {};
-
-  for (const k of keys) {
-    const env = k.environment || "Unassigned";
-    byEnvironment[env] = (byEnvironment[env] || 0) + 1;
-
-    if (k.status === "Revoked") {
-      revokedOrExpired++;
-      continue;
-    }
-
-    if (k.status === "Paused") {
-      paused++;
-      continue;
-    }
-
-    // Active or other
-    if (k.expiry_date) {
-      const exp = new Date(k.expiry_date);
-      if (!Number.isNaN(exp.getTime())) {
-        if (exp < now) {
-          revokedOrExpired++;
-          continue;
-        }
-        if (exp <= sevenDaysFromNow) {
-          expiringSoon++;
-          active++;
-          continue;
-        }
-      }
-    }
-    active++;
-  }
-
-  return {
-    total: keys.length,
-    active,
-    expiringSoon,
-    revokedOrExpired,
-    paused,
-    byEnvironment
-  };
-}
 
   // Stats calculation
   app.get("/api/stats", (req, res) => {
@@ -625,11 +633,8 @@ function calculateKeyStats(keys: any[]) {
   });
 }
 
-void (async () => {
-  try {
-    await startServer();
-  } catch (err) {
-    console.error("Failed to start server:", err);
-    process.exit(1);
-  }
-})();
+startServer().catch((err) => {
+  console.error("Failed to start server:", err);
+  process.exit(1);
+});
+

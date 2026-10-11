@@ -131,22 +131,14 @@ export function calculateEntropy(secret: string, format: SecretFormat): {
   const cleanLength = secret.replace(/[^a-zA-Z0-9!@#$%^&*()_=+[\\]{}|-]/g, "").length;
   const bits = Math.round(cleanLength * Math.log2(poolSize));
 
-  let strength: "Weak" | "Moderate" | "Strong" | "Very Strong" = "Weak";
-  let crackTimeEstimate = "Instant";
-
   if (bits < 60) {
-    strength = "Weak";
-    crackTimeEstimate = "< a few minutes";
-  } else if (bits < 90) {
-    strength = "Moderate";
-    crackTimeEstimate = "~ several centuries";
-  } else if (bits < 128) {
-    strength = "Strong";
-    crackTimeEstimate = "billions of years";
-  } else {
-    strength = "Very Strong";
-    crackTimeEstimate = "trillions of centuries (unbreakable)";
+    return { bits, strength: "Weak", crackTimeEstimate: "< a few minutes" };
   }
-
-  return { bits, strength, crackTimeEstimate };
+  if (bits < 90) {
+    return { bits, strength: "Moderate", crackTimeEstimate: "~ several centuries" };
+  }
+  if (bits < 128) {
+    return { bits, strength: "Strong", crackTimeEstimate: "billions of years" };
+  }
+  return { bits, strength: "Very Strong", crackTimeEstimate: "trillions of centuries (unbreakable)" };
 }

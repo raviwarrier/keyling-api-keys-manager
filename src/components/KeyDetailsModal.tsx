@@ -120,7 +120,7 @@ const SnippetViewer: React.FC<SnippetViewerProps> = ({ item }) => {
   const snippet = getSnippetForTab(item, codeTab);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(snippet);
+    void navigator.clipboard.writeText(snippet);
     setCopiedSnippet(codeTab);
     setTimeout(() => setCopiedSnippet(null), 2000);
   };

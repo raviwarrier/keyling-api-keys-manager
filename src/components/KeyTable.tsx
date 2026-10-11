@@ -106,6 +106,7 @@ interface HeaderCellProps {
   colKey: ColumnKey;
   columnOrder: ColumnKey[];
   sortBy: string;
+  sortOrder?: "ASC" | "DESC";
   onSortChange: (column: string) => void;
   onReorderColumns?: (newOrder: ColumnKey[]) => void;
 }
@@ -114,6 +115,7 @@ const HeaderCell: React.FC<HeaderCellProps> = ({
   colKey,
   columnOrder,
   sortBy,
+  sortOrder,
   onSortChange,
   onReorderColumns,
 }) => {
@@ -145,7 +147,7 @@ const HeaderCell: React.FC<HeaderCellProps> = ({
             type="button"
             onClick={() => onSortChange(colKey)}
             className="flex items-center gap-1.5 hover:text-[#09090b] dark:hover:text-[#f4f4f5] transition-colors cursor-pointer text-left select-none font-medium"
-            title={`Sort by ${config.label}`}
+            title={`Sort by ${config.label}${sortBy === colKey && sortOrder ? ` (${sortOrder === "ASC" ? "Ascending" : "Descending"})` : ""}`}
           >
             <span>{config.label}</span>
             <ArrowUpDown
@@ -726,6 +728,7 @@ export const KeyTable: React.FC<KeyTableProps> = ({
   onToggleSelect,
   onSelectAll,
   sortBy,
+  sortOrder,
   onSortChange,
 }) => {
   const [revealedOrgIds, setRevealedOrgIds] = useState<Record<number, boolean>>({});
@@ -742,14 +745,14 @@ export const KeyTable: React.FC<KeyTableProps> = ({
   };
 
   const handleCopyOrg = (orgId: string, appName: string, id: number) => {
-    navigator.clipboard.writeText(orgId);
+    void navigator.clipboard.writeText(orgId);
     setCopiedOrgId(id);
     setTimeout(() => setCopiedOrgId(null), 2000);
     onCopyKey(orgId, `${appName} (Org ID)`);
   };
 
   const handleCopyClient = (clientId: string, appName: string, id: number) => {
-    navigator.clipboard.writeText(clientId);
+    void navigator.clipboard.writeText(clientId);
     setCopiedClientId(id);
     setTimeout(() => setCopiedClientId(null), 2000);
     onCopyKey(clientId, `${appName} (Client ID)`);
@@ -788,6 +791,7 @@ export const KeyTable: React.FC<KeyTableProps> = ({
                   colKey={colKey}
                   columnOrder={columnOrder}
                   sortBy={sortBy}
+                  sortOrder={sortOrder}
                   onSortChange={onSortChange}
                   onReorderColumns={onReorderColumns}
                 />
