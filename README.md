@@ -110,7 +110,7 @@ PM2 is a production process manager for Node.js that keeps your application runn
 
    *Alternatively, start directly using CLI arguments:*
    ```bash
-   PORT=6644 pm2 start dist/server.cjs --name "keyling"
+   PORT=6644 pm2 start dist/server.js --name "keyling"
    ```
 
 3. Save the process list and enable automatic boot startup:
@@ -240,7 +240,7 @@ Set the `PORT` environment variable when starting:
 
 - **Via PM2 CLI:**
   ```bash
-  PORT=8080 pm2 start dist/server.cjs --name "keyling" --update-env
+  PORT=8080 pm2 start dist/server.js --name "keyling" --update-env
   ```
 - **Via `ecosystem.config.cjs`:**
   Edit the `PORT` value inside `ecosystem.config.cjs`:

@@ -29,9 +29,8 @@ COPY --from=builder /app/dist ./dist
 RUN mkdir -p /app/data && chown -R node:node /app
 
 USER node
-
+ 
 EXPOSE 6644
-
 VOLUME ["/app/data"]
 
-CMD ["node", "dist/server.cjs"]
+CMD ["node", "dist/server.js"]

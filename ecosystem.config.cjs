@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: "keyling",
-      script: "dist/server.cjs",
+      script: "dist/server.js",
       instances: 1,
       autorestart: true,
       watch: false,

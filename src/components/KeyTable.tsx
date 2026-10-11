@@ -139,6 +139,12 @@ const HeaderCell: React.FC<HeaderCellProps> = ({
     onReorderColumns(newOrder);
   };
 
+  let sortTitle = `Sort by ${config.label}`;
+  if (sortBy === colKey && sortOrder) {
+    const directionLabel = sortOrder === "ASC" ? "Ascending" : "Descending";
+    sortTitle += ` (${directionLabel})`;
+  }
+
   return (
     <th className={thClass}>
       <div className="flex items-center justify-between gap-1.5">
@@ -147,7 +153,7 @@ const HeaderCell: React.FC<HeaderCellProps> = ({
             type="button"
             onClick={() => onSortChange(colKey)}
             className="flex items-center gap-1.5 hover:text-[#09090b] dark:hover:text-[#f4f4f5] transition-colors cursor-pointer text-left select-none font-medium"
-            title={`Sort by ${config.label}${sortBy === colKey && sortOrder ? ` (${sortOrder === "ASC" ? "Ascending" : "Descending"})` : ""}`}
+            title={sortTitle}
           >
             <span>{config.label}</span>
             <ArrowUpDown

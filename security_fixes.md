@@ -5,7 +5,8 @@
 ### Analysis & Remediation Rounds Summary
 - **Round 1**: 161 issues identified & resolved (Issues #1 through #161)
 - **Round 2**: 19 post-check-in issues identified & resolved (Issues #162 through #180 / Round 2 #1 through #19)
-- **Total Resolved**: 180 issues across all rounds (continually appended as new scans occur)
+- **Round 3**: 3 issues identified & resolved (Issues #181 through #183 / Round 3 #1 through #3)
+- **Total Resolved**: 183 issues across all rounds (continually appended as new scans occur)
 
 ---
 
@@ -1622,3 +1623,34 @@
 - **Rule**: `typescript:S4165` | **Line**: L138
 - **File**: `raviwarrier_keyling-api-keys-manager:src/utils/secretGenerator.ts`
 - **Resolution**: Cleaned up branching in `calculateEntropy` to avoid redundant assignments, returning pristine immutable result objects directly.
+
+---
+
+### Round 3 (3 Additional Issues)
+
+---
+
+### Issue #181 (Round 3 #1)
+- **Issue**: Prefer top-level await over using a promise chain.
+- **Type**: CODE_SMELL | **Severity**: MAJOR
+- **Rule**: `typescript:S7785` | **Line**: L636
+- **File**: `raviwarrier_keyling-api-keys-manager:server.ts`
+- **Resolution**: Replaced `startServer().catch(...)` with `try { await startServer(); } catch (err) { ... }` using top-level await, and migrated backend build packaging to ESM (`--format=esm --outfile=dist/server.js`) so top-level await runs natively on Node.js without CJS bundling constraints.
+
+---
+
+### Issue #182 (Round 3 #2)
+- **Issue**: Refactor this code to not use nested template literals.
+- **Type**: CODE_SMELL | **Severity**: MAJOR
+- **Rule**: `typescript:S4624` | **Line**: L150
+- **File**: `raviwarrier_keyling-api-keys-manager:src/components/KeyTable.tsx`
+- **Resolution**: Extracted header sorting label computation into an independent statement (`sortTitle`) outside JSX attributes, eliminating nested template string literals.
+
+---
+
+### Issue #183 (Round 3 #3)
+- **Issue**: Extract this nested ternary operation into an independent statement.
+- **Type**: CODE_SMELL | **Severity**: MAJOR
+- **Rule**: `typescript:S3358` | **Line**: L150
+- **File**: `raviwarrier_keyling-api-keys-manager:src/components/KeyTable.tsx`
+- **Resolution**: Extracted the nested ternary condition (`sortOrder === "ASC" ? "Ascending" : "Descending"`) into an explicit `directionLabel` assignment inside an `if (sortBy === colKey && sortOrder)` guard, simplifying logic flow and eliminating nested ternaries.
